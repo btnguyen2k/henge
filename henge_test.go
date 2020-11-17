@@ -380,7 +380,7 @@ func TestUniversalBo_json(t *testing.T) {
 	var ubo2 *UniversalBo
 	err := json.Unmarshal(js1, &ubo2)
 	if err != nil {
-		t.Fatalf("%s failed: %e", name, err)
+		t.Fatalf("%s failed: %s", name, err)
 	}
 
 	if ubo1.id != ubo2.id {
@@ -457,7 +457,7 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 		}
 	}
 	if v, err := ubo.GetExtraAttrAs("str", reddo.TypeString); err != nil {
-		t.Fatalf("%s failed: %e", name, err)
+		t.Fatalf("%s failed: %s", name, err)
 	} else if v != "a string" {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, "a string", v)
 	}
@@ -465,12 +465,12 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, 123, v)
 	}
 	if v, err := ubo.GetExtraAttrAsTimeWithLayout("d", TimeLayout); err != nil {
-		t.Fatalf("%s failed: %e", name, err)
+		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Nanosecond() != now.Nanosecond() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(TimeLayout), v.Format(TimeLayout))
 	}
 	if v, err := ubo.GetExtraAttrAsTimeWithLayout("dstr", TimeLayout); err != nil {
-		t.Fatalf("%s failed: %e", name, err)
+		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Nanosecond() != now.Nanosecond() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
@@ -494,7 +494,7 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 	fields := []string{"s.t.r.str", "i[0].int", "b", "time[0]", "time[1]"}
 	for _, f := range fields {
 		if v, err := ubo.GetDataAttr(f); err != nil {
-			t.Fatalf("%s failed: %e", name, err)
+			t.Fatalf("%s failed: %s", name, err)
 		} else if v == nil {
 			t.Fatalf("%s failed: path %s does not exist", name, f)
 		}
@@ -503,7 +503,7 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 		}
 	}
 	if v, err := ubo.GetDataAttrAs("s.t.r.str", reddo.TypeString); err != nil {
-		t.Fatalf("%s failed: %e", name, err)
+		t.Fatalf("%s failed: %s", name, err)
 	} else if v != "a string" {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, "a string", v)
 	}
@@ -511,12 +511,12 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, 123, v)
 	}
 	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[0]", TimeLayout); err != nil {
-		t.Fatalf("%s failed: %e", name, err)
+		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Nanosecond() != now.Nanosecond() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(TimeLayout), v.Format(TimeLayout))
 	}
 	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[1]", TimeLayout); err != nil {
-		t.Fatalf("%s failed: %e", name, err)
+		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Nanosecond() != now.Nanosecond() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}

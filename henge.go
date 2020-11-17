@@ -179,8 +179,8 @@ func (ubo *UniversalBo) MarshalJSON() ([]byte, error) {
 		FieldData:        ubo.dataJson,
 		FieldTagVersion:  ubo.tagVersion,
 		FieldChecksum:    ubo.checksum,
-		FieldTimeCreated: ubo.timeCreated,
-		FieldTimeUpdated: ubo.timeUpdated,
+		FieldTimeCreated: ubo.timeCreated.Format(TimeLayout),
+		FieldTimeUpdated: ubo.timeUpdated.Format(TimeLayout),
 		FieldExtras:      cloneMap(ubo._extraAttrs),
 	}
 	return json.Marshal(m)
