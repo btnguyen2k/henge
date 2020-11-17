@@ -2,6 +2,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/btnguyen2k/henge)](https://goreportcard.com/report/github.com/btnguyen2k/henge)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/btnguyen2k/henge)](https://pkg.go.dev/github.com/btnguyen2k/henge)
+[![Actions Status](https://github.com/btnguyen2k/henge/workflows/Henge/badge.svg)](https://github.com/btnguyen2k/henge/actions)
 
 package henge is an out-of-the-box NoSQL style universal data access layer implementation.
 
