@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Test
+    name: Test with MySQL
     runs-on: ubuntu-latest
     steps:
     - name: Set up Go env
@@ -19,6 +19,7 @@ jobs:
       uses: actions/checkout@v2
     # - name: Test
     #   run: go test -cover -v .
-    - name: TryDocker
+    - name: Start MySQL server
       run: |
-        docker images
+        docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=test -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8
+        docker ps -a
