@@ -1,4 +1,4 @@
-// package henge is an out-of-the-box NoSQL style universal data access layer implementation.
+// Package henge is an out-of-the-box NoSQL style universal data access layer implementation.
 //
 // See project's wiki for documentation: https://github.com/btnguyen2k/henge/wiki
 package henge
@@ -260,8 +260,8 @@ const (
 )
 
 var (
-	ErrorDataInitedAsMap   = errors.New("data is initialized as empty map")
-	ErrorDataInitedAsSlice = errors.New("data is initialized as empty slice")
+	errorDataInitedAsMap   = errors.New("data is initialized as empty map")
+	errorDataInitedAsSlice = errors.New("data is initialized as empty slice")
 )
 
 func (ubo *UniversalBo) _parseDataJson(dataInit dataInitType) error {
@@ -269,10 +269,10 @@ func (ubo *UniversalBo) _parseDataJson(dataInit dataInitType) error {
 	if err != nil || ubo._data == nil {
 		if dataInit == dataInitMap {
 			ubo._data = make(map[string]interface{})
-			err = ErrorDataInitedAsMap
+			err = errorDataInitedAsMap
 		} else if dataInit == dataInitSlice {
 			ubo._data = make([]interface{}, 0)
-			err = ErrorDataInitedAsMap
+			err = errorDataInitedAsMap
 		} else {
 			ubo._data = nil
 		}
@@ -318,17 +318,17 @@ func (ubo *UniversalBo) GetChecksum() string {
 	return ubo.checksum
 }
 
-// GetChecksum returns value of bo's 'timestamp-created' field.
+// GetTimeCreated returns value of bo's 'timestamp-created' field.
 func (ubo *UniversalBo) GetTimeCreated() time.Time {
 	return ubo.timeCreated
 }
 
-// GetChecksum returns value of bo's 'timestamp-updated' field.
+// GetTimeUpdated returns value of bo's 'timestamp-updated' field.
 func (ubo *UniversalBo) GetTimeUpdated() time.Time {
 	return ubo.timeUpdated
 }
 
-// GetChecksum returns value of bo's 'timestamp-updated' field.
+// SetTimeUpdated sets value of bo's 'timestamp-updated' field.
 func (ubo *UniversalBo) SetTimeUpdated(value time.Time) *UniversalBo {
 	ubo.timeUpdated = value
 	return ubo
