@@ -1,0 +1,8 @@
+.DS_Store
+/.idea/
+/.vscode/
+/vendor/
+/coverage.out
+/qnd/
+/coverage.html
+/temp/
