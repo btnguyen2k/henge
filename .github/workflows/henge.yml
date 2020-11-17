@@ -23,3 +23,4 @@ jobs:
       run: |
         docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=test -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8
         docker ps -a
+        netstat -lntp
