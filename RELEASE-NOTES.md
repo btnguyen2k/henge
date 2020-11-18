@@ -4,5 +4,5 @@
 
 First release - out-of-the-box universal data access layer implementations for
 - MySQL, PostgreSQL, SQLite
-- MongoDB (TODO)
+- MongoDB (Standalone & ReplicaSet)
 - AWS DynamoDB  (TODO)

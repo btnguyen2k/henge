@@ -90,7 +90,7 @@ func _testMysqlInit(t *testing.T, name, tblName string) (*prom.SqlConnect, Unive
 		t.Fatalf("%s failed: %s", name, err)
 	}
 	extraColNameToFieldMappings := map[string]string{"col_email": "email", "col_age": "age"}
-	return sqlc, NewUniversalDaoSql(sqlc, tblName, extraColNameToFieldMappings)
+	return sqlc, NewUniversalDaoSql(sqlc, tblName, true, extraColNameToFieldMappings)
 }
 
 func TestMysql_Create(t *testing.T) {
