@@ -6,7 +6,7 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
-// NewSqliteConnection creates a new connection pool for SQLite database.
+// NewSqliteConnection creates a new connection pool for SQLite.
 //
 // - dir is the root directory to store SQLite data files.
 // - dbName is name of the SQLite database.

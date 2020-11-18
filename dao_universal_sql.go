@@ -27,12 +27,17 @@ func buildRowMapperSql(tableName string, extraColNameToFieldMappings map[string]
 }
 
 // NewUniversalDaoSql is helper method to create UniversalDaoSql instance.
-func NewUniversalDaoSql(sqlc *prom.SqlConnect, tableName string, extraColNameToFieldMappings map[string]string) UniversalDao {
+//
+// - txModeOnWrite: enables/disables transaction mode on write operations.
+//       RDBMS/SQL's implementation of GdaoSave is "try update, if failed then insert".
+//       It can be done either in transaction (txModeOnWrite=true) or non-transaction (txModeOnWrite=false) mode.
+//       Recommended setting is "txModeOnWrite=true".
+func NewUniversalDaoSql(sqlc *prom.SqlConnect, tableName string, txModeOnWrite bool, extraColNameToFieldMappings map[string]string) UniversalDao {
 	dao := &UniversalDaoSql{tableName: tableName}
 	dao.GenericDaoSql = sql.NewGenericDaoSql(sqlc, godal.NewAbstractGenericDao(dao))
 	dao.SetRowMapper(buildRowMapperSql(tableName, extraColNameToFieldMappings))
 	dao.SetSqlFlavor(sqlc.GetDbFlavor())
-	dao.SetTxModeOnWrite(true)
+	dao.SetTxModeOnWrite(txModeOnWrite)
 	return dao
 }
 

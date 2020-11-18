@@ -6,7 +6,7 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
-// NewPgsqlConnection creates a new connection pool for PostgreSQL database.
+// NewPgsqlConnection creates a new connection pool for PostgreSQL.
 //
 // Note: it's application's responsibility to import proper PostgreSQL driver, e.g. import _ "github.com/jackc/pgx/v4/stdlib"
 // and supply the correct driver, e.g. "pgx"

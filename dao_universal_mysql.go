@@ -6,7 +6,7 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
-// NewMysqlConnection creates a new connection pool for MySQL database.
+// NewMysqlConnection creates a new connection pool for MySQL.
 //
 // Note: it's application's responsibility to import proper MySQL driver, e.g. import _ "github.com/go-sql-driver/mysql"
 // and supply the correct driver, e.g. "mysql"
