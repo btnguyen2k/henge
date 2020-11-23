@@ -11,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	awsdynamodb "github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
@@ -19,16 +18,14 @@ import (
 )
 
 func _adbDeleteTableAndWait(adc *prom.AwsDynamodbConnect, tableName string) error {
-	err := adc.DeleteTable(nil, tableName)
-	err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableNotFoundException)
+	adc.DeleteTable(nil, tableName)
 	for ok, err := adc.HasTable(nil, tableName); err == nil && ok; {
 		fmt.Printf("\tTable %s exists, waiting for deletion...\n", tableName)
 		time.Sleep(1 * time.Second)
 	}
 
 	uidxTableName := tableName + AwsDynamodbUidxTableSuffix
-	err = adc.DeleteTable(nil, uidxTableName)
-	err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableNotFoundException)
+	adc.DeleteTable(nil, uidxTableName)
 	for ok, err := adc.HasTable(nil, tableName); err == nil && ok; {
 		fmt.Printf("\tTable %s exists, waiting for deletion...\n", uidxTableName)
 		time.Sleep(1 * time.Second)
@@ -111,16 +108,16 @@ func _testDynamodbInit(t *testing.T, testName string, adc *prom.AwsDynamodbConne
 }
 
 const (
-	awsDynamodbTable_NoUidx = "tbl_nouidx"
-	awsDynamodbTable_Uidx   = "tbl_uidx"
+	awsDynamodbTableNoUidx = "tbl_nouidx"
+	awsDynamodbTableUidx   = "tbl_uidx"
 )
 
 func TestDynamodb_Create(t *testing.T) {
 	name := "TestDynamodb_Create"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -142,8 +139,8 @@ func TestDynamodb_CreateExistingPK(t *testing.T) {
 	name := "TestDynamodb_CreateExistingPK"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -174,8 +171,8 @@ func TestDynamodb_CreateExistingUnique(t *testing.T) {
 	name := "TestDynamodb_CreateExistingUnique"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id1", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -224,8 +221,8 @@ func TestDynamodb_CreateGet(t *testing.T) {
 	name := "TestDynamodb_CreateGet"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -269,8 +266,8 @@ func TestDynamodb_CreateDelete(t *testing.T) {
 	name := "TestDynamodb_CreateDelete"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -310,8 +307,8 @@ func TestDynamodb_CreateGetMany(t *testing.T) {
 	name := "TestDynamodb_CreateGetMany"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -346,8 +343,8 @@ func TestDynamodb_CreateGetManyWithFilter(t *testing.T) {
 	name := "TestDynamodb_CreateGetManyWithFilter"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -398,8 +395,8 @@ func TestDynamodb_CreateGetManyWithPaging(t *testing.T) {
 	name := "TestDynamodb_CreateGetManyWithPaging"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -438,8 +435,8 @@ func TestDynamodb_Update(t *testing.T) {
 	name := "TestDynamodb_Update"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -501,8 +498,8 @@ func TestDynamodb_UpdateNotExist(t *testing.T) {
 	name := "TestDynamodb_UpdateNotExist"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -524,8 +521,8 @@ func TestDynamodb_UpdateDuplicated(t *testing.T) {
 	name := "TestDynamodb_UpdateDuplicated"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo1 := NewUniversalBo("1", 1357)
 	ubo2 := NewUniversalBo("2", 1357)
@@ -567,8 +564,8 @@ func TestDynamodb_SaveNew(t *testing.T) {
 	name := "TestDynamodb_SaveNew"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -620,8 +617,8 @@ func TestDynamodb_SaveExisting(t *testing.T) {
 	name := "TestDynamodb_SaveExisting"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -704,8 +701,8 @@ func TestDynamodb_SaveExistingUnique(t *testing.T) {
 	name := "TestDynamodb_SaveExistingUnique"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
-	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTable_NoUidx, nil)
-	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTable_Uidx, [][]string{{"email"}, {"subject", "level"}})
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
 
 	ubo1 := NewUniversalBo("1", 1357)
 	ubo2 := NewUniversalBo("2", 1357)

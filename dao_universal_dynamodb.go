@@ -17,8 +17,12 @@ import (
 
 const (
 	// AwsDynamodbUidxTableSuffix holds prefix string of the secondary table which henge uses to manage unique indexes.
-	AwsDynamodbUidxTableSuffix  = "_uidx"
+	AwsDynamodbUidxTableSuffix = "_uidx"
+
+	// AwsDynamodbUidxTableColName holds name of the secondary table's column to store unique index name.
 	AwsDynamodbUidxTableColName = "uname"
+
+	// AwsDynamodbUidxTableColName holds name of the secondary table's column to store unique index hash value.
 	AwsDynamodbUidxTableColHash = "uhash"
 )
 
@@ -129,7 +133,7 @@ func (dao *UniversalDaoDynamodb) GetUidxHashFunctions() []checksum.HashFunc {
 
 // SetUidxHashFunctions configures the hash functions used to calculate unique index hash.
 //
-// Currently two hash functions are used, and two must be different. By default, the following hash fucntions
+// Currently two hash functions are used, and two must be different. By default, the following hash functions
 // will be used: checksum.Sha1HashFunc and checksum.Md5HashFunc
 func (dao *UniversalDaoDynamodb) SetUidxHashFunctions(uidxHashFuncs []checksum.HashFunc) *UniversalDaoDynamodb {
 	if len(uidxHashFuncs) > 0 && uidxHashFuncs[0] != nil {
@@ -224,7 +228,7 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, errors.New(fmt.Sprintf("cannot find primary-key attribute list for table [%s]", dao.tableName))
+		return false, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
 	}
 	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
 	if !ok || keyFilter == nil {
@@ -238,13 +242,13 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 		return false, err
 	} else {
 		condition := prom.AwsDynamodbExistsAllBuilder(pkAttrs)
-		if conditionExp, err := expression.NewBuilder().WithCondition(*condition).Build(); err != nil {
+		conditionExp, err := expression.NewBuilder().WithCondition(*condition).Build()
+		if err != nil {
 			return false, err
-		} else {
-			txItem.Delete.ConditionExpression = conditionExp.Condition()
-			txItem.Delete.ExpressionAttributeNames = conditionExp.Names()
-			txItem.Delete.ExpressionAttributeValues = conditionExp.Values()
 		}
+		txItem.Delete.ConditionExpression = conditionExp.Condition()
+		txItem.Delete.ExpressionAttributeNames = conditionExp.Names()
+		txItem.Delete.ExpressionAttributeValues = conditionExp.Values()
 		txItems = append(txItems, txItem)
 	}
 
@@ -252,11 +256,11 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 	uidxValues := dao.BuildUidxValues(gbo)
 	for k, v := range uidxValues {
 		keyFilterUidx := map[string]interface{}{AwsDynamodbUidxTableColName: k, AwsDynamodbUidxTableColHash: v}
-		if txItem, err := adc.BuildTxDelete(dao.uidxTableName, keyFilterUidx, nil); err != nil {
+		txItem, err := adc.BuildTxDelete(dao.uidxTableName, keyFilterUidx, nil)
+		if err != nil {
 			return false, err
-		} else {
-			txItems = append(txItems, txItem)
 		}
+		txItems = append(txItems, txItem)
 	}
 
 	// wrap all steps inside a transaction
@@ -278,7 +282,7 @@ func (dao *UniversalDaoDynamodb) Create(bo *UniversalBo) (bool, error) {
 
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, errors.New(fmt.Sprintf("cannot find primary-key attribute list for table [%s]", dao.tableName))
+		return false, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
 	}
 	row, err := dao.GetRowMapper().ToRow(dao.tableName, gbo)
 	if err != nil {
@@ -288,11 +292,11 @@ func (dao *UniversalDaoDynamodb) Create(bo *UniversalBo) (bool, error) {
 	adc := dao.GetAwsDynamodbConnect()
 
 	// step 1: insert record to the main table
-	if txItem, err := adc.BuildTxPutIfNotExist(dao.tableName, row, pkAttrs); err != nil {
+	txItem, err := adc.BuildTxPutIfNotExist(dao.tableName, row, pkAttrs)
+	if err != nil {
 		return false, err
-	} else {
-		txItems = append(txItems, txItem)
 	}
+	txItems = append(txItems, txItem)
 
 	// step 2: insert record(s) to the uidx table
 	uidxValues := dao.BuildUidxValues(gbo)
@@ -302,11 +306,11 @@ func (dao *UniversalDaoDynamodb) Create(bo *UniversalBo) (bool, error) {
 		for _, pkAttr := range pkAttrs {
 			rowUidx[pkAttr] = gbo.GboGetAttrUnsafe(pkAttr, nil)
 		}
-		if txItem, err := adc.BuildTxPutIfNotExist(dao.uidxTableName, rowUidx, pkAttrsUidx); err != nil {
+		txItem, err := adc.BuildTxPutIfNotExist(dao.uidxTableName, rowUidx, pkAttrsUidx)
+		if err != nil {
 			return false, err
-		} else {
-			txItems = append(txItems, txItem)
 		}
+		txItems = append(txItems, txItem)
 	}
 
 	// wrap all steps inside a transaction
@@ -371,7 +375,7 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, errors.New(fmt.Sprintf("cannot find primary-key attribute list for table [%s]", dao.tableName))
+		return false, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
 	}
 	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
 	if !ok || keyFilter == nil {
@@ -395,11 +399,11 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 
 	// step 1: update existing record in the main table
 	condition := prom.AwsDynamodbExistsAllBuilder(pkAttrs)
-	if txItem, err := adc.BuildTxUpdate(dao.tableName, keyFilter, condition, nil, rowMap, nil, nil); err != nil {
+	txItem, err := adc.BuildTxUpdate(dao.tableName, keyFilter, condition, nil, rowMap, nil, nil)
+	if err != nil {
 		return false, err
-	} else {
-		txItems = append(txItems, txItem)
 	}
+	txItems = append(txItems, txItem)
 
 	// step 2 & 3: remove existing records in the uidx table and insert updated ones
 	oldUidxValues := dao.BuildUidxValues(oldGbo)
@@ -408,11 +412,11 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 	for k, v := range oldUidxValues {
 		if v != uidxValues[k] {
 			keyFilterUidx := map[string]interface{}{AwsDynamodbUidxTableColName: k, AwsDynamodbUidxTableColHash: v}
-			if txItem, err := adc.BuildTxDelete(dao.uidxTableName, keyFilterUidx, nil); err != nil {
+			txItem, err := adc.BuildTxDelete(dao.uidxTableName, keyFilterUidx, nil)
+			if err != nil {
 				return false, err
-			} else {
-				txItems = append(txItems, txItem)
 			}
+			txItems = append(txItems, txItem)
 		}
 	}
 	for k, v := range uidxValues {
@@ -421,11 +425,11 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 			for _, pkAttr := range pkAttrs {
 				rowUidx[pkAttr] = gbo.GboGetAttrUnsafe(pkAttr, nil)
 			}
-			if txItem, err := adc.BuildTxPutIfNotExist(dao.uidxTableName, rowUidx, pkAttrsUidx); err != nil {
+			txItem, err := adc.BuildTxPutIfNotExist(dao.uidxTableName, rowUidx, pkAttrsUidx)
+			if err != nil {
 				return false, err
-			} else {
-				txItems = append(txItems, txItem)
 			}
+			txItems = append(txItems, txItem)
 		}
 	}
 
@@ -458,7 +462,7 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 	oldGbo := dao.ToGenericBo(existing)
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, existing, errors.New(fmt.Sprintf("cannot find primary-key attribute list for table [%s]", dao.tableName))
+		return false, existing, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
 	}
 	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
 	if !ok || keyFilter == nil {
@@ -472,20 +476,16 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 	if !ok || keyFilter == nil {
 		return false, existing, errors.New("row data must be a map")
 	}
-	// // remove primary key attributes from update list
-	// for _, pk := range pkAttrs {
-	// 	delete(rowMap, pk)
-	// }
 
 	txItems := make([]*awsdynamodb.TransactWriteItem, 0)
 	adc := dao.GetAwsDynamodbConnect()
 
 	// step 1: save existing record in the main table
-	if txItem, err := adc.BuildTxPut(dao.tableName, rowMap, nil); err != nil {
+	txItem, err := adc.BuildTxPut(dao.tableName, rowMap, nil)
+	if err != nil {
 		return false, nil, err
-	} else {
-		txItems = append(txItems, txItem)
 	}
+	txItems = append(txItems, txItem)
 
 	// step 2 & 3: remove existing records in the uidx table and insert updated ones
 	oldUidxValues := dao.BuildUidxValues(oldGbo)
@@ -494,11 +494,11 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 	for k, v := range oldUidxValues {
 		if v != uidxValues[k] {
 			keyFilterUidx := map[string]interface{}{AwsDynamodbUidxTableColName: k, AwsDynamodbUidxTableColHash: v}
-			if txItem, err := adc.BuildTxDelete(dao.uidxTableName, keyFilterUidx, nil); err != nil {
+			txItem, err := adc.BuildTxDelete(dao.uidxTableName, keyFilterUidx, nil)
+			if err != nil {
 				return false, existing, err
-			} else {
-				txItems = append(txItems, txItem)
 			}
+			txItems = append(txItems, txItem)
 		}
 	}
 	for k, v := range uidxValues {
@@ -507,11 +507,11 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 			for _, pkAttr := range pkAttrs {
 				rowUidx[pkAttr] = gbo.GboGetAttrUnsafe(pkAttr, nil)
 			}
-			if txItem, err := adc.BuildTxPutIfNotExist(dao.uidxTableName, rowUidx, pkAttrsUidx); err != nil {
+			txItem, err := adc.BuildTxPutIfNotExist(dao.uidxTableName, rowUidx, pkAttrsUidx)
+			if err != nil {
 				return false, existing, err
-			} else {
-				txItems = append(txItems, txItem)
 			}
+			txItems = append(txItems, txItem)
 		}
 	}
 
