@@ -6,7 +6,7 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
-// NewSqliteConnection creates a new connection pool for SQLite.
+// NewSqliteConnection is helper function to create connection pools for SQLite.
 //
 // - dir is the root directory to store SQLite data files.
 // - dbName is name of the SQLite database.
@@ -26,7 +26,7 @@ func NewSqliteConnection(dir, dbName, driver string, defaultTimeoutMs int, poolO
 	return sqlc, nil
 }
 
-// InitSqliteTable initializes a database table.
+// InitSqliteTable initializes a database table to store henge business objects.
 //
 // - Table is created "if not exists" as the following: {SqlColId: "VARCHAR(64)", SqlColData: "TEXT",
 //     SqlColChecksum: "VARCHAR(32)", SqlColTimeCreated: "TIMESTAMP", SqlColTimeUpdated: "TIMESTAMP",

@@ -5,6 +5,8 @@ github.com/aws/aws-sdk-go v1.31.14 h1:uRC2riabEXPMHl1CDylsfCod5DKjiOSXhYvxg/Eb9V
 github.com/aws/aws-sdk-go v1.31.14/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
 github.com/btnguyen2k/consu/checksum v0.1.1 h1:1EQXi0GeAJ6d6iruULCP5fTMO/6QFM4iN+gq4lBW2pM=
 github.com/btnguyen2k/consu/checksum v0.1.1/go.mod h1:Kye8gGAK2BnHsB+DmffPOLhJW/YYFAOUosXnuSmyOf8=
+github.com/btnguyen2k/consu/checksum v0.1.2 h1:lmwNWztbfi11CNAxqdi8NcHZdKq0gZiVRqCPfobXj94=
+github.com/btnguyen2k/consu/checksum v0.1.2/go.mod h1:/zZ8EXdphDYEkBFua51hK9y3rODCPIkiZYnCDlHT670=
 github.com/btnguyen2k/consu/reddo v0.1.4/go.mod h1:6L2l4rRFQlyGWlKxt9SiwYs/wB6SE70oxFcrTo/YLPY=
 github.com/btnguyen2k/consu/reddo v0.1.6 h1:NUG2Uw0HWnJjiUUzhNwpTTQheoM1JKVza+5HWd/kQtU=
 github.com/btnguyen2k/consu/reddo v0.1.6/go.mod h1:6L2l4rRFQlyGWlKxt9SiwYs/wB6SE70oxFcrTo/YLPY=
