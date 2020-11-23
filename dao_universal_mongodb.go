@@ -10,16 +10,7 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
-// NewMongoConnection creates a new connection pool for MongoDB.
-func NewMongoConnection(url, db string, defaultTimeoutMs int) (*prom.MongoConnect, error) {
-	mc, err := prom.NewMongoConnect(url, db, defaultTimeoutMs)
-	if err != nil {
-		return nil, err
-	}
-	return mc, nil
-}
-
-// InitMongoCollection initializes a MongoDB collection.
+// InitMongoCollection initializes a MongoDB collection to store henge business objects.
 func InitMongoCollection(mc *prom.MongoConnect, collectionName string) error {
 	_, err := mc.CreateCollection(collectionName)
 	return err

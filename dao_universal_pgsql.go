@@ -6,7 +6,7 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
-// NewPgsqlConnection creates a new connection pool for PostgreSQL.
+// NewPgsqlConnection is helper function to create connection pools for PostgreSQL.
 //
 // Note: it's application's responsibility to import proper PostgreSQL driver, e.g. import _ "github.com/jackc/pgx/v4/stdlib"
 // and supply the correct driver, e.g. "pgx"
@@ -20,7 +20,7 @@ func NewPgsqlConnection(url, timezone, driver string, defaultTimeoutMs int, pool
 	return sqlc, nil
 }
 
-// InitPgsqlTable initializes a database table.
+// InitPgsqlTable initializes a database table to store henge business objects.
 //
 // - Table is created "if not exists" as the following: {SqlColId: "VARCHAR(64)", SqlColData: "JSONB", SqlColChecksum: "VARCHAR(32)",
 //     SqlColTimeCreated: "TIMESTAMP WITH TIME ZONE", SqlColTimeUpdated: "TIMESTAMP WITH TIME ZONE",

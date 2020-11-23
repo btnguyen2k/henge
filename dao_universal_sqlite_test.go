@@ -380,47 +380,10 @@ func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
 	}
 }
 
-// // currently godal does not support SQLite flavor!
-// func TestSqlite_CreateGetManyWithSortingAndPaging(t *testing.T) {
-// 	name := "TestSqlite_CreateGetManyWithSortingAndPaging"
-// 	tblName := "table_temp"
-// 	sqlc, dao := _testSqliteInit(t, name, tblName)
-// 	defer sqlc.Close()
-//
-// 	idList := make([]string, 0)
-// 	for i := 0; i < 10; i++ {
-// 		idList = append(idList, strconv.Itoa(i))
-// 	}
-// 	rand.Seed(time.Now().UnixNano())
-// 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
-// 	for i := 0; i < 10; i++ {
-// 		ubo := NewUniversalBo(idList[i], uint64(i))
-// 		ubo.SetDataAttr("name.first", strconv.Itoa(i))
-// 		ubo.SetDataAttr("name.last", "Nguyen")
-// 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
-// 		ubo.SetExtraAttr("age", 35+i)
-// 		if ok, err := dao.Create(ubo); err != nil {
-// 			t.Fatalf("%s failed: %s", name, err)
-// 		} else if !ok {
-// 			t.Fatalf("%s failed: cannot create record", name)
-// 		}
-// 	}
-//
-// 	fromOffset := 3
-// 	numRows := 4
-// 	sorting := map[string]string{"col_email": "desc"}
-// 	if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
-// 		t.Fatalf("%s failed: %s", name, err)
-// 	} else if len(boList) != numRows {
-// 		t.Fatalf("%s failed: expected %#v items but received %#v", name, numRows, len(boList))
-// 	} else {
-// 		for i := 0; i < numRows; i++ {
-// 			if boList[i].GetId() != strconv.Itoa(9-i-fromOffset) {
-// 				t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(9-i-fromOffset), boList[i].GetId())
-// 			}
-// 		}
-// 	}
-// }
+// currently godal does not support SQLite flavor!
+func TestSqlite_CreateGetManyWithSortingAndPaging(t *testing.T) {
+	// name := "TestSqlite_CreateGetManyWithSortingAndPaging"
+}
 
 func TestSqlite_Update(t *testing.T) {
 	name := "TestSqlite_Update"

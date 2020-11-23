@@ -29,9 +29,9 @@ func _testMongoInitMongoConnect(t *testing.T, testName, collectionName string) *
 	if mongoDb == "" {
 		mongoDb = "test"
 	}
-	mc, err := NewMongoConnection(mongoUrl, mongoDb, 10000)
+	mc, err := prom.NewMongoConnect(mongoUrl, mongoDb, 10000)
 	if err != nil {
-		t.Fatalf("%s/%s failed: %s", testName, "NewMongoConnection", err)
+		t.Fatalf("%s/%s failed: %s", testName, "NewMongoConnect", err)
 	}
 	if err := _cleanupMongo(mc, collectionName); err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "_cleanupMongo", err)

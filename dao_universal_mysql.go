@@ -6,7 +6,7 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
-// NewMysqlConnection creates a new connection pool for MySQL.
+// NewMysqlConnection is helper function to create connection pools for MySQL.
 //
 // Note: it's application's responsibility to import proper MySQL driver, e.g. import _ "github.com/go-sql-driver/mysql"
 // and supply the correct driver, e.g. "mysql"
@@ -20,7 +20,7 @@ func NewMysqlConnection(url, timezone, driver string, defaultTimeoutMs int, pool
 	return sqlc, nil
 }
 
-// InitMysqlTable initializes a database table.
+// InitMysqlTable initializes a database table to store henge business objects.
 //
 // - Table is created "if not exists" as the following: {SqlColId: "VARCHAR(64)", SqlColData: "TEXT", SqlColChecksum: "VARCHAR(32)",
 //     SqlColTimeCreated: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP", SqlColTimeUpdated: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
