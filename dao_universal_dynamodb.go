@@ -22,7 +22,7 @@ const (
 	// AwsDynamodbUidxTableColName holds name of the secondary table's column to store unique index name.
 	AwsDynamodbUidxTableColName = "uname"
 
-	// AwsDynamodbUidxTableColName holds name of the secondary table's column to store unique index hash value.
+	// AwsDynamodbUidxTableColHash holds name of the secondary table's column to store unique index hash value.
 	AwsDynamodbUidxTableColHash = "uhash"
 )
 
@@ -238,19 +238,19 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 	adc := dao.GetAwsDynamodbConnect()
 
 	// step 1: delete record from the main table
-	if txItem, err := adc.BuildTxDelete(dao.tableName, keyFilter, nil); err != nil {
+	txItem, err := adc.BuildTxDelete(dao.tableName, keyFilter, nil)
+	if err != nil {
 		return false, err
-	} else {
-		condition := prom.AwsDynamodbExistsAllBuilder(pkAttrs)
-		conditionExp, err := expression.NewBuilder().WithCondition(*condition).Build()
-		if err != nil {
-			return false, err
-		}
-		txItem.Delete.ConditionExpression = conditionExp.Condition()
-		txItem.Delete.ExpressionAttributeNames = conditionExp.Names()
-		txItem.Delete.ExpressionAttributeValues = conditionExp.Values()
-		txItems = append(txItems, txItem)
 	}
+	condition := prom.AwsDynamodbExistsAllBuilder(pkAttrs)
+	conditionExp, err := expression.NewBuilder().WithCondition(*condition).Build()
+	if err != nil {
+		return false, err
+	}
+	txItem.Delete.ConditionExpression = conditionExp.Condition()
+	txItem.Delete.ExpressionAttributeNames = conditionExp.Names()
+	txItem.Delete.ExpressionAttributeValues = conditionExp.Values()
+	txItems = append(txItems, txItem)
 
 	// step 2: delete record(s) from the uidx table
 	uidxValues := dao.BuildUidxValues(gbo)
@@ -264,7 +264,7 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 	}
 
 	// wrap all steps inside a transaction
-	_, err := adc.ExecTxWriteItems(nil, &awsdynamodb.TransactWriteItemsInput{TransactItems: txItems})
+	_, err = adc.ExecTxWriteItems(nil, &awsdynamodb.TransactWriteItemsInput{TransactItems: txItems})
 	if prom.IsAwsError(err, awsdynamodb.ErrCodeTransactionCanceledException) {
 		return false, nil
 	}
