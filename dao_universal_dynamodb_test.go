@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"github.com/btnguyen2k/consu/checksum"
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/prom"
@@ -93,8 +95,20 @@ func TestInitDynamodbTable(t *testing.T) {
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
 	_cleanupDynamodb(adc, tableName)
+	if ok, err := adc.HasTable(nil, tableName); err != nil || ok {
+		t.Fatalf("%s failed: error [%s] or table [%s] exist", name, err, tableName)
+	}
+	if ok, err := adc.HasTable(nil, tableName+AwsDynamodbUidxTableSuffix); err != nil || ok {
+		t.Fatalf("%s failed: error [%s] or table [%s] exist", name, err, tableName+AwsDynamodbUidxTableSuffix)
+	}
 	if err := InitDynamodbTable(adc, tableName, awsDynamodbRCU, awsDynamodbWCU); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
+	}
+	if ok, err := adc.HasTable(nil, tableName); err != nil || !ok {
+		t.Fatalf("%s failed: error [%s] or table [%s] does not exist", name, err, tableName)
+	}
+	if ok, err := adc.HasTable(nil, tableName+AwsDynamodbUidxTableSuffix); err != nil || !ok {
+		t.Fatalf("%s failed: error [%s] or table [%s] does not exist", name, err, tableName+AwsDynamodbUidxTableSuffix)
 	}
 	_cleanupDynamodb(adc, tableName)
 }
@@ -105,6 +119,63 @@ func _testDynamodbInit(t *testing.T, testName string, adc *prom.AwsDynamodbConne
 		t.Fatalf("%s failed: %s", testName, err)
 	}
 	return NewUniversalDaoDynamodb(adc, tableName, uidxIndexes)
+}
+
+func TestNewUniversalDaoDynamodb(t *testing.T) {
+	name := "TestNewUniversalDaoDynamodb"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+
+	tableName := "tbl_test"
+	dao := NewUniversalDaoDynamodb(adc, tableName, nil).(*UniversalDaoDynamodb)
+	if dao.GetTableName() != tableName {
+		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableName, dao.GetTableName())
+	}
+	if tableNameUidx := tableName + AwsDynamodbUidxTableSuffix; tableNameUidx != dao.GetUidxTableName() {
+		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableNameUidx, dao.GetUidxTableName())
+	}
+	if dao.GetUidxAttrs() != nil {
+		t.Fatalf("%s failed: expected Uidx attr %#v but received %#v", name, nil, dao.GetUidxAttrs())
+	}
+
+	uidxAttrs := [][]string{{"email"}, {"subject", "level"}}
+	dao = NewUniversalDaoDynamodb(adc, tableName, uidxAttrs).(*UniversalDaoDynamodb)
+	if dao.GetTableName() != tableName {
+		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableName, dao.GetTableName())
+	}
+	if tableNameUidx := tableName + AwsDynamodbUidxTableSuffix; tableNameUidx != dao.GetUidxTableName() {
+		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableNameUidx, dao.GetUidxTableName())
+	}
+	if !reflect.DeepEqual(uidxAttrs, dao.GetUidxAttrs()) {
+		t.Fatalf("%s failed: expected Uidx attr %#v but received %#v", name, uidxAttrs, dao.GetUidxAttrs())
+	}
+	dao.SetUidxAttrs(nil)
+	if dao.GetUidxAttrs() != nil {
+		t.Fatalf("%s failed: expected Uidx attr %#v but received %#v", name, nil, dao.GetUidxAttrs())
+	}
+}
+
+func TestUniversalDaoDynamodb_SetGetUidxHashFunctions(t *testing.T) {
+	name := "TestUniversalDaoDynamodb_SetGetUidxHashFunctions"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+
+	tableName := "tbl_test"
+	dao := NewUniversalDaoDynamodb(adc, tableName, nil).(*UniversalDaoDynamodb)
+	if hfList := dao.GetUidxHashFunctions(); len(hfList) != 2 || hfList[0] == nil || hfList[1] == nil {
+		t.Fatalf("%s failed", name)
+	}
+
+	hfListInput := []checksum.HashFunc{checksum.Crc32HashFunc, checksum.Sha512HashFunc, checksum.Md5HashFunc}
+	dao.SetUidxHashFunctions(hfListInput)
+	if hfList := dao.GetUidxHashFunctions(); len(hfList) != 2 || hfList[0] == nil || hfList[1] == nil {
+		t.Fatalf("%s failed", name)
+	}
+
+	dao.SetUidxHashFunctions(nil)
+	if hfList := dao.GetUidxHashFunctions(); len(hfList) != 2 || hfList[0] == nil || hfList[1] == nil {
+		t.Fatalf("%s failed", name)
+	}
 }
 
 const (

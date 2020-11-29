@@ -28,10 +28,11 @@ const (
 
 // InitDynamodbTable initializes a DynamoDB table to store henge business objects.
 //
-// This function will create 2 tables. One with name 'tableName' to store business objects. The other one has
+// This function will create 2 tables. One with name <tableName> to store business objects. The other one has
 // the same base name and suffixed by AwsDynamodbUidxTableSuffix. The second table is used to manage unique indexes.
 //
-// The second table will be created with the same RCU/WCU and has the following schema {AwsDynamodbUidxTableColName:AwsDynamodbUidxTableColHash}
+// The second table will be created with the same RCU/WCU and has the following schema:
+// { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
 func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu int64) error {
 	attrDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsAttrTypeString}}
 	pkDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsKeyTypePartition}}
