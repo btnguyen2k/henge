@@ -42,8 +42,6 @@ func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface
 // ToBo implements godal.IRowMapper.ToBo
 func (r *rowMapperMongo) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
 	gbo, err := r.wrap.ToBo(storageId, row)
-	// fmt.Printf("ToBo: %s\n", row)
-	// fmt.Printf("ToBo: %s\n", gbo.GboToJsonUnsafe())
 	if err == nil {
 		var v interface{}
 		v, err = gbo.GboGetAttr(MongoColId, nil)
