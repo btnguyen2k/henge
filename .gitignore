@@ -4,5 +4,5 @@
 /vendor/
 /coverage.out
 /qnd/
-/coverage.html
+/coverage*.*
 /temp/
