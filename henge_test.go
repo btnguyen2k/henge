@@ -427,6 +427,15 @@ func TestUniversalBo_SetTagVersion(t *testing.T) {
 	}
 }
 
+func TestUniversalBo_GetTimeCreated(t *testing.T) {
+	name := "TestUniversalBo_GetTimeCreated"
+	now := time.Now()
+	ubo := NewUniversalBo("id", 1357)
+	if d := ubo.GetTimeCreated().Nanosecond() - now.Nanosecond(); d > 10000 {
+		t.Fatalf("%s failed: expected delta less than %#v but received %#v", name, 10000, d)
+	}
+}
+
 func TestUniversalBo_SetTimeUpdated(t *testing.T) {
 	name := "TestUniversalBo_SetTimeUpdated"
 	ubo := NewUniversalBo("id", 1357)
@@ -445,7 +454,7 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 	ubo.SetExtraAttr("int", 123)
 	ubo.SetExtraAttr("b", true)
 	ubo.SetExtraAttr("dstr", now.Format(TimeLayout))
-	ubo.SetExtraAttr("d", now)
+	ubo.SetExtraAttr("d", &now)
 	fields := []string{"str", "int", "b", "dstr", "d"}
 	m := ubo.GetExtraAttrs()
 	for _, f := range fields {
@@ -490,7 +499,7 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 	ubo.SetDataAttr("i[0].int", 123)
 	ubo.SetDataAttr("b", true)
 	ubo.SetDataAttr("time[0]", now.Format(TimeLayout))
-	ubo.SetDataAttr("time[1]", now)
+	ubo.SetDataAttr("time[1]", &now)
 	fields := []string{"s.t.r.str", "i[0].int", "b", "time[0]", "time[1]"}
 	for _, f := range fields {
 		if v, err := ubo.GetDataAttr(f); err != nil {

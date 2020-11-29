@@ -189,29 +189,29 @@ func (ubo *UniversalBo) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements json.decode.Unmarshaler.UnmarshalJSON.
 func (ubo *UniversalBo) UnmarshalJSON(data []byte) error {
 	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
-		return err
+	err := json.Unmarshal(data, &m)
+	if err == nil {
+		m[FieldId], err = reddo.ToString(m[FieldId])
 	}
-	var err error
-	if m[FieldId], err = reddo.ToString(m[FieldId]); err != nil {
-		return err
+	if err == nil {
+		m[FieldData], err = reddo.ToString(m[FieldData])
 	}
-	if m[FieldData], err = reddo.ToString(m[FieldData]); err != nil {
-		return err
+	if err == nil {
+		m[FieldTagVersion], err = reddo.ToUint(m[FieldTagVersion])
 	}
-	if m[FieldTagVersion], err = reddo.ToUint(m[FieldTagVersion]); err != nil {
-		return err
+	if err == nil {
+		m[FieldChecksum], err = reddo.ToString(m[FieldChecksum])
 	}
-	if m[FieldChecksum], err = reddo.ToString(m[FieldChecksum]); err != nil {
-		return err
+	if err == nil {
+		m[FieldTimeCreated], err = reddo.ToTimeWithLayout(m[FieldTimeCreated], TimeLayout)
 	}
-	if m[FieldTimeCreated], err = reddo.ToTimeWithLayout(m[FieldTimeCreated], TimeLayout); err != nil {
-		return err
+	if err == nil {
+		m[FieldTimeUpdated], err = reddo.ToTimeWithLayout(m[FieldTimeUpdated], TimeLayout)
 	}
-	if m[FieldTimeUpdated], err = reddo.ToTimeWithLayout(m[FieldTimeUpdated], TimeLayout); err != nil {
-		return err
+	if err == nil {
+		m[FieldExtras], err = reddo.ToMap(m[FieldExtras], reflect.TypeOf(map[string]interface{}{}))
 	}
-	if m[FieldExtras], err = reddo.ToMap(m[FieldExtras], reflect.TypeOf(map[string]interface{}{})); err != nil {
+	if err != nil {
 		return err
 	}
 
@@ -222,10 +222,9 @@ func (ubo *UniversalBo) UnmarshalJSON(data []byte) error {
 	ubo.checksum = m[FieldChecksum].(string)
 	ubo.timeCreated = m[FieldTimeCreated].(time.Time)
 	ubo.timeUpdated = m[FieldTimeUpdated].(time.Time)
+	ubo._extraAttrs = make(map[string]interface{})
 	if m[FieldExtras] != nil {
 		ubo._extraAttrs = m[FieldExtras].(map[string]interface{})
-	} else {
-		ubo._extraAttrs = make(map[string]interface{})
 	}
 	ubo._setDataJson(m[FieldData].(string))
 	ubo._sync()
