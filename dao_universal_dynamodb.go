@@ -51,33 +51,33 @@ func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu 
 	return prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException)
 }
 
-func buildRowMapperDynamodb(tableName string) godal.IRowMapper {
-	return &rowMapperDynamodb{wrap: &dynamodb.GenericRowMapperDynamodb{
-		ColumnsListMap: map[string][]string{tableName: {FieldId}},
-	}}
-}
-
-// rowMapperDynamodb is an implementation of godal.IRowMapper specific for AWS DynamoDB.
-type rowMapperDynamodb struct {
-	wrap godal.IRowMapper
-}
-
-// ToRow implements godal.IRowMapper.ToRow
-func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
-	row, err := r.wrap.ToRow(storageId, bo)
-	return row, err
-}
-
-// ToBo implements godal.IRowMapper.ToBo
-func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
-	gbo, err := r.wrap.ToBo(storageId, row)
-	return gbo, err
-}
-
-// ColumnsList implements godal.IRowMapper.ColumnsList
-func (r *rowMapperDynamodb) ColumnsList(storageId string) []string {
-	return r.wrap.ColumnsList(storageId)
-}
+// func buildRowMapperDynamodb(tableName string) godal.IRowMapper {
+// 	return &rowMapperDynamodb{wrap: &dynamodb.GenericRowMapperDynamodb{
+// 		ColumnsListMap: map[string][]string{tableName: {FieldId}},
+// 	}}
+// }
+//
+// // rowMapperDynamodb is an implementation of godal.IRowMapper specific for AWS DynamoDB.
+// type rowMapperDynamodb struct {
+// 	wrap godal.IRowMapper
+// }
+//
+// // ToRow implements godal.IRowMapper.ToRow
+// func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
+// 	row, err := r.wrap.ToRow(storageId, bo)
+// 	return row, err
+// }
+//
+// // ToBo implements godal.IRowMapper.ToBo
+// func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
+// 	gbo, err := r.wrap.ToBo(storageId, row)
+// 	return gbo, err
+// }
+//
+// // ColumnsList implements godal.IRowMapper.ColumnsList
+// func (r *rowMapperDynamodb) ColumnsList(storageId string) []string {
+// 	return r.wrap.ColumnsList(storageId)
+// }
 
 // NewUniversalDaoDynamodb is helper method to create UniversalDaoDynamodb instance.
 //
@@ -91,7 +91,10 @@ func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, uid
 		uidxHf2:       checksum.Md5HashFunc,
 	}
 	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
-	dao.SetRowMapper(buildRowMapperDynamodb(tableName))
+	// dao.SetRowMapper(buildRowMapperDynamodb(tableName))
+	dao.SetRowMapper(&dynamodb.GenericRowMapperDynamodb{
+		ColumnsListMap: map[string][]string{tableName: {FieldId}},
+	})
 	return dao
 }
 
