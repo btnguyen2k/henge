@@ -13,17 +13,17 @@ import (
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/sql"
 	"github.com/btnguyen2k/prom"
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/godror/godror"
 )
 
-func _cleanupMysql(sqlc *prom.SqlConnect, tableName string) error {
-	_, err := sqlc.GetDB().Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+func _cleanupOracle(sqlc *prom.SqlConnect, tableName string) error {
+	_, err := sqlc.GetDB().Exec(fmt.Sprintf("DROP TABLE %s", tableName))
 	return err
 }
 
-func _testMysqlInitSqlConnect(t *testing.T, testName, tableName string) *prom.SqlConnect {
-	driver := strings.ReplaceAll(os.Getenv("MYSQL_DRIVER"), `"`, "")
-	url := strings.ReplaceAll(os.Getenv("MYSQL_URL"), `"`, "")
+func _testOracleInitSqlConnect(t *testing.T, testName, tableName string) *prom.SqlConnect {
+	driver := strings.ReplaceAll(os.Getenv("ORACLE_DRIVER"), `"`, "")
+	url := strings.ReplaceAll(os.Getenv("ORACLE_URL"), `"`, "")
 	if driver == "" || url == "" {
 		t.Skipf("%s skipped", testName)
 		return nil
@@ -37,42 +37,40 @@ func _testMysqlInitSqlConnect(t *testing.T, testName, tableName string) *prom.Sq
 	url = strings.ReplaceAll(url, "${tz}", urlTimezone)
 	url = strings.ReplaceAll(url, "${timezone}", urlTimezone)
 
-	sqlc, err := NewMysqlConnection(url, timezone, driver, 10000, nil)
+	sqlc, err := NewOracleConnection(url, timezone, driver, 10000, nil)
 	if err != nil {
-		t.Fatalf("%s/%s failed: %s", testName, "NewMysqlConnection", err)
+		t.Fatalf("%s/%s failed: %s", testName, "NewOracleConnection", err)
 	}
-	if err := _cleanupMysql(sqlc, tableName); err != nil {
-		t.Fatalf("%s/%s failed: %s", testName, "_cleanupMysql", err)
+	if err := _cleanupOracle(sqlc, tableName); err != nil && strings.Index(fmt.Sprintf("%s", err), "ORA-00942") < 0 {
+		t.Fatalf("%s/%s failed: %s", testName, "_cleanupOracle", err)
 	}
 	return sqlc
 }
 
-func TestNewMysqlConnection(t *testing.T) {
-	name := "TestNewMysqlConnection"
-	sqlc := _testMysqlInitSqlConnect(t, name, "table_temp")
+func TestNewOracleConnection(t *testing.T) {
+	name := "TestNewOracleConnection"
+	sqlc := _testOracleInitSqlConnect(t, name, "table_temp")
 	defer sqlc.Close()
 }
 
-func TestInitMysqlTable(t *testing.T) {
-	name := "TestInitMysqlTable"
+func TestInitOracleTable(t *testing.T) {
+	name := "TestInitOracleTable"
 	tblName := "table_temp"
-	sqlc := _testMysqlInitSqlConnect(t, name, tblName)
+	sqlc := _testOracleInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
 	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
-	for i := 0; i < 2; i++ {
-		if err := InitMysqlTable(sqlc, tblName, colDef); err != nil {
-			t.Fatalf("%s failed: %s", name, err)
-		}
+	if err := InitOracleTable(sqlc, tblName, colDef); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
 	}
 }
 
-func TestCreateIndexMysql(t *testing.T) {
-	name := "TestCreateIndexMysql"
+func TestCreateIndexOracle(t *testing.T) {
+	name := "TestCreateIndexOracle"
 	tblName := "table_temp"
-	sqlc := _testMysqlInitSqlConnect(t, name, tblName)
+	sqlc := _testOracleInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
 	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
-	if err := InitMysqlTable(sqlc, tblName, colDef); err != nil {
+	if err := InitOracleTable(sqlc, tblName, colDef); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 	if err := CreateIndexSql(sqlc, tblName, true, []string{"col_email"}); err != nil {
@@ -83,10 +81,10 @@ func TestCreateIndexMysql(t *testing.T) {
 	}
 }
 
-func _testMysqlInit(t *testing.T, name, tblName string) (*prom.SqlConnect, UniversalDao) {
-	sqlc := _testMysqlInitSqlConnect(t, name, tblName)
+func _testOracleInit(t *testing.T, name, tblName string) (*prom.SqlConnect, UniversalDao) {
+	sqlc := _testOracleInitSqlConnect(t, name, tblName)
 	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
-	if err := InitMysqlTable(sqlc, tblName, colDef); err != nil {
+	if err := InitOracleTable(sqlc, tblName, colDef); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 	if err := CreateIndexSql(sqlc, tblName, true, []string{"col_email"}); err != nil {
@@ -99,10 +97,10 @@ func _testMysqlInit(t *testing.T, name, tblName string) (*prom.SqlConnect, Unive
 	return sqlc, NewUniversalDaoSql(sqlc, tblName, true, extraColNameToFieldMappings)
 }
 
-func TestMysql_Create(t *testing.T) {
-	name := "TestMysql_Create"
+func TestOracle_Create(t *testing.T) {
+	name := "TestOracle_Create"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -117,10 +115,10 @@ func TestMysql_Create(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateExistingPK(t *testing.T) {
-	name := "TestMysql_CreateExistingPK"
+func TestOracle_CreateExistingPK(t *testing.T) {
+	name := "TestOracle_CreateExistingPK"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -142,10 +140,10 @@ func TestMysql_CreateExistingPK(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateExistingUnique(t *testing.T) {
-	name := "TestMysql_CreateExistingUnique"
+func TestOracle_CreateExistingUnique(t *testing.T) {
+	name := "TestOracle_CreateExistingUnique"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -167,10 +165,10 @@ func TestMysql_CreateExistingUnique(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateGet(t *testing.T) {
-	name := "TestMysql_CreateGet"
+func TestOracle_CreateGet(t *testing.T) {
+	name := "TestOracle_CreateGet"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -207,10 +205,10 @@ func TestMysql_CreateGet(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateDelete(t *testing.T) {
-	name := "TestMysql_CreateDelete"
+func TestOracle_CreateDelete(t *testing.T) {
+	name := "TestOracle_CreateDelete"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -243,10 +241,10 @@ func TestMysql_CreateDelete(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateGetMany(t *testing.T) {
-	name := "TestMysql_CreateGetMany"
+func TestOracle_CreateGetMany(t *testing.T) {
+	name := "TestOracle_CreateGetMany"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -275,10 +273,10 @@ func TestMysql_CreateGetMany(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateGetManyWithFilter(t *testing.T) {
-	name := "TestMysql_CreateGetManyWithFilter"
+func TestOracle_CreateGetManyWithFilter(t *testing.T) {
+	name := "TestOracle_CreateGetManyWithFilter"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -308,10 +306,10 @@ func TestMysql_CreateGetManyWithFilter(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateGetManyWithSorting(t *testing.T) {
-	name := "TestMysql_CreateGetManyWithSorting"
+func TestOracle_CreateGetManyWithSorting(t *testing.T) {
+	name := "TestOracle_CreateGetManyWithSorting"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -345,10 +343,10 @@ func TestMysql_CreateGetManyWithSorting(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateGetManyWithFilterAndSorting(t *testing.T) {
-	name := "TestMysql_CreateGetManyWithFilterAndSorting"
+func TestOracle_CreateGetManyWithFilterAndSorting(t *testing.T) {
+	name := "TestOracle_CreateGetManyWithFilterAndSorting"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -383,10 +381,10 @@ func TestMysql_CreateGetManyWithFilterAndSorting(t *testing.T) {
 	}
 }
 
-func TestMysql_CreateGetManyWithSortingAndPaging(t *testing.T) {
-	name := "TestMysql_CreateGetManyWithSortingAndPaging"
+func TestOracle_CreateGetManyWithSortingAndPaging(t *testing.T) {
+	name := "TestOracle_CreateGetManyWithSortingAndPaging"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -424,10 +422,10 @@ func TestMysql_CreateGetManyWithSortingAndPaging(t *testing.T) {
 	}
 }
 
-func TestMysql_Update(t *testing.T) {
-	name := "TestMysql_Update"
+func TestOracle_Update(t *testing.T) {
+	name := "TestOracle_Update"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -472,10 +470,10 @@ func TestMysql_Update(t *testing.T) {
 	}
 }
 
-func TestMysql_UpdateNotExist(t *testing.T) {
-	name := "TestMysql_UpdateNotExist"
+func TestOracle_UpdateNotExist(t *testing.T) {
+	name := "TestOracle_UpdateNotExist"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -490,10 +488,10 @@ func TestMysql_UpdateNotExist(t *testing.T) {
 	}
 }
 
-func TestMysql_UpdateDuplicated(t *testing.T) {
-	name := "TestMysql_UpdateDuplicated"
+func TestOracle_UpdateDuplicated(t *testing.T) {
+	name := "TestOracle_UpdateDuplicated"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 
 	ubo1 := NewUniversalBo("1", 1357)
@@ -519,10 +517,10 @@ func TestMysql_UpdateDuplicated(t *testing.T) {
 	}
 }
 
-func TestMysql_SaveNew(t *testing.T) {
-	name := "TestMysql_SaveNew"
+func TestOracle_SaveNew(t *testing.T) {
+	name := "TestOracle_SaveNew"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -561,10 +559,10 @@ func TestMysql_SaveNew(t *testing.T) {
 	}
 }
 
-func TestMysql_SaveExisting(t *testing.T) {
-	name := "TestMysql_SaveExisting"
+func TestOracle_SaveExisting(t *testing.T) {
+	name := "TestOracle_SaveExisting"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -627,10 +625,10 @@ func TestMysql_SaveExisting(t *testing.T) {
 	}
 }
 
-func TestMysql_SaveExistingUnique(t *testing.T) {
-	name := "TestMysql_SaveExistingUnique"
+func TestOracle_SaveExistingUnique(t *testing.T) {
+	name := "TestOracle_SaveExistingUnique"
 	tblName := "table_temp"
-	sqlc, dao := _testMysqlInit(t, name, tblName)
+	sqlc, dao := _testOracleInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo1 := NewUniversalBo("1", 1357)
 	ubo1.SetDataAttr("name.first", "Thanh1")
