@@ -22,7 +22,7 @@ func NewSqliteConnection(dir, dbName, driver string, defaultTimeoutMs int, poolO
 	if err != nil {
 		return nil, err
 	}
-	sqlc.SetDbFlavor(prom.FlavorDefault)
+	sqlc.SetDbFlavor(prom.FlavorSqlite)
 	return sqlc, nil
 }
 

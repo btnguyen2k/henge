@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,15 +21,29 @@ func _cleanupSqlite(dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func _testSqliteInitSqlConnect(t *testing.T, name string) *prom.SqlConnect {
-	dbDir := "./temp"
-	dbName := "tempdb"
-	if err := _cleanupSqlite(dbDir); err != nil {
-		t.Fatalf("%s/%s failed: %s", name, "_cleanupSqlite", err)
+func _testSqliteInitSqlConnect(t *testing.T, testName string) *prom.SqlConnect {
+	driver := strings.ReplaceAll(os.Getenv("SQLITE_DRIVER"), `"`, "")
+	url := strings.ReplaceAll(os.Getenv("SQLITE_URL"), `"`, "")
+	if driver == "" || url == "" {
+		t.Skipf("%s skipped", testName)
+		return nil
 	}
-	sqlc, err := NewSqliteConnection(dbDir, dbName, "sqlite3", 10000, nil)
+	timezone := strings.ReplaceAll(os.Getenv("TIMEZONE"), `"`, "")
+	if timezone == "" {
+		timezone = "Asia/Ho_Chi_Minh"
+	}
+	urlTimezone := strings.ReplaceAll(timezone, "/", "%2f")
+	url = strings.ReplaceAll(url, "${loc}", urlTimezone)
+	url = strings.ReplaceAll(url, "${tz}", urlTimezone)
+	url = strings.ReplaceAll(url, "${timezone}", urlTimezone)
+
+	dbName := "tempdb"
+	if err := _cleanupSqlite(url); err != nil {
+		t.Fatalf("%s/%s failed: %s", testName, "_cleanupSqlite", err)
+	}
+	sqlc, err := NewSqliteConnection(url, dbName, driver, 10000, nil)
 	if err != nil {
-		t.Fatalf("%s/%s failed: %s", name, "NewSqliteConnection", err)
+		t.Fatalf("%s/%s failed: %s", testName, "NewSqliteConnection", err)
 	}
 	return sqlc
 }

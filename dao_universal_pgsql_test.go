@@ -22,8 +22,9 @@ func _cleanupPgsql(sqlc *prom.SqlConnect, tableName string) error {
 }
 
 func _testPgsqlInitSqlConnect(t *testing.T, testName, tableName string) *prom.SqlConnect {
-	PgsqlUrl := strings.ReplaceAll(os.Getenv("PGSQL_URL"), `"`, "")
-	if PgsqlUrl == "" {
+	driver := strings.ReplaceAll(os.Getenv("PGSQL_DRIVER"), `"`, "")
+	url := strings.ReplaceAll(os.Getenv("PGSQL_URL"), `"`, "")
+	if driver == "" || url == "" {
 		t.Skipf("%s skipped", testName)
 		return nil
 	}
@@ -31,7 +32,12 @@ func _testPgsqlInitSqlConnect(t *testing.T, testName, tableName string) *prom.Sq
 	if timezone == "" {
 		timezone = "Asia/Ho_Chi_Minh"
 	}
-	sqlc, err := NewPgsqlConnection(PgsqlUrl, timezone, "pgx", 10000, nil)
+	urlTimezone := strings.ReplaceAll(timezone, "/", "%2f")
+	url = strings.ReplaceAll(url, "${loc}", urlTimezone)
+	url = strings.ReplaceAll(url, "${tz}", urlTimezone)
+	url = strings.ReplaceAll(url, "${timezone}", urlTimezone)
+
+	sqlc, err := NewPgsqlConnection(url, timezone, driver, 10000, nil)
 	if err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "NewPgsqlConnection", err)
 	}
