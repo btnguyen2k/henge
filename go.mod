@@ -1,4 +1,4 @@
-module henge
+module github.com/btnguyen2k/henge
 
 go 1.13
 
