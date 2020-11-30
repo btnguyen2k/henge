@@ -11,6 +11,9 @@ import (
 )
 
 // InitMongoCollection initializes a MongoDB collection to store henge business objects.
+//
+// - This function creates the specified collection with default settings.
+// - Other than the collection, no index is created.
 func InitMongoCollection(mc *prom.MongoConnect, collectionName string) error {
 	_, err := mc.CreateCollection(collectionName)
 	return err

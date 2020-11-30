@@ -28,11 +28,11 @@ const (
 
 // InitDynamodbTable initializes a DynamoDB table to store henge business objects.
 //
-// This function will create 2 tables. One with name <tableName> to store business objects. The other one has
-// the same base name and suffixed by AwsDynamodbUidxTableSuffix. The second table is used to manage unique indexes.
-//
-// The second table will be created with the same RCU/WCU and has the following schema:
-// { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
+// - This function will create 2 tables. Main table with name <tableName> to store business objects. The secondary table
+//   has the same base name and suffixed by AwsDynamodbUidxTableSuffix. The secondary table is used to manage unique indexes.
+// - The secondary table will be created with the same RCU/WCU and has the following schema:
+//   { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
+// - Other than the two tables, no local index or global index is created.
 func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu int64) error {
 	attrDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsAttrTypeString}}
 	pkDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsKeyTypePartition}}
@@ -51,34 +51,6 @@ func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu 
 	return prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException)
 }
 
-// func buildRowMapperDynamodb(tableName string) godal.IRowMapper {
-// 	return &rowMapperDynamodb{wrap: &dynamodb.GenericRowMapperDynamodb{
-// 		ColumnsListMap: map[string][]string{tableName: {FieldId}},
-// 	}}
-// }
-//
-// // rowMapperDynamodb is an implementation of godal.IRowMapper specific for AWS DynamoDB.
-// type rowMapperDynamodb struct {
-// 	wrap godal.IRowMapper
-// }
-//
-// // ToRow implements godal.IRowMapper.ToRow
-// func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
-// 	row, err := r.wrap.ToRow(storageId, bo)
-// 	return row, err
-// }
-//
-// // ToBo implements godal.IRowMapper.ToBo
-// func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
-// 	gbo, err := r.wrap.ToBo(storageId, row)
-// 	return gbo, err
-// }
-//
-// // ColumnsList implements godal.IRowMapper.ColumnsList
-// func (r *rowMapperDynamodb) ColumnsList(storageId string) []string {
-// 	return r.wrap.ColumnsList(storageId)
-// }
-
 // NewUniversalDaoDynamodb is helper method to create UniversalDaoDynamodb instance.
 //
 // - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
@@ -91,7 +63,6 @@ func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, uid
 		uidxHf2:       checksum.Md5HashFunc,
 	}
 	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
-	// dao.SetRowMapper(buildRowMapperDynamodb(tableName))
 	dao.SetRowMapper(&dynamodb.GenericRowMapperDynamodb{
 		ColumnsListMap: map[string][]string{tableName: {FieldId}},
 	})
