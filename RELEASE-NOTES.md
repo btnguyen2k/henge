@@ -1,5 +1,10 @@
 # henge release notes
 
+## 2020-12-02 - v0.2.2
+
+- Store `zdata` field to DynamoDB as object.
+- Other fixes & enhancements.
+
 ## 2020-11-30 - v0.2.1
 
 - Fix module name.

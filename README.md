@@ -7,7 +7,7 @@
 
 package henge is an out-of-the-box NoSQL style universal data access layer implementation.
 
-Latest release [v0.2.1](RELEASE-NOTES.md).
+Latest release [v0.2.2](RELEASE-NOTES.md).
 
 ## Documentation
 
