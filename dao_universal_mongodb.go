@@ -31,28 +31,35 @@ type rowMapperMongo struct {
 // ToRow implements godal.IRowMapper.ToRow
 func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
 	row, err := r.wrap.ToRow(storageId, bo)
-	if m, ok := row.(map[string]interface{}); err == nil && ok {
+	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
 		m[MongoColId] = m[FieldId]
 		delete(m, FieldId)
 		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
 		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
 		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
-		m[FieldData], _ = bo.GboGetAttrUnmarshalJson(FieldData)
+		m[FieldData], _ = bo.GboGetAttrUnmarshalJson(FieldData) // Note: FieldData must be JSON-encoded string!
 	}
-	return row, nil
+	return row, err
 }
 
 // ToBo implements godal.IRowMapper.ToBo
 func (r *rowMapperMongo) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
 	gbo, err := r.wrap.ToBo(storageId, row)
-	if err == nil {
+	if err == nil && gbo != nil {
 		var v interface{}
 		v, err = gbo.GboGetAttr(MongoColId, nil)
 		gbo.GboSetAttr(MongoColId, nil)
 		gbo.GboSetAttr(FieldId, v)
 		if data, err := gbo.GboGetAttr(FieldData, nil); err == nil {
-			js, _ := json.Marshal(data)
-			gbo.GboSetAttr(FieldData, string(js))
+			// Note: convert 'data' column from row to JSON-encoded string before storing to FieldData
+			if str, ok := data.(string); ok {
+				gbo.GboSetAttr(FieldData, str)
+			} else if bytes, ok := data.([]byte); ok {
+				gbo.GboSetAttr(FieldData, string(bytes))
+			} else {
+				js, _ := json.Marshal(data)
+				gbo.GboSetAttr(FieldData, string(js))
+			}
 		}
 	}
 	return gbo, err
@@ -120,6 +127,7 @@ func (dao *UniversalDaoMongo) ToGenericBo(ubo *UniversalBo) godal.IGenericBo {
 	if ubo == nil {
 		return nil
 	}
+	ubo = ubo.Clone()
 	gbo := godal.NewGenericBo()
 	gbo.GboSetAttr(FieldId, ubo.id)
 	gbo.GboSetAttr(FieldData, ubo.dataJson)
@@ -141,7 +149,7 @@ func (dao *UniversalDaoMongo) Delete(bo *UniversalBo) (bool, error) {
 
 // Create implements UniversalDao.Create.
 func (dao *UniversalDaoMongo) Create(bo *UniversalBo) (bool, error) {
-	numRows, err := dao.GdaoCreate(dao.collectionName, dao.ToGenericBo(bo.Clone()))
+	numRows, err := dao.GdaoCreate(dao.collectionName, dao.ToGenericBo(bo))
 	return numRows > 0, err
 }
 
@@ -179,7 +187,7 @@ func (dao *UniversalDaoMongo) GetAll(filter interface{}, sorting interface{}) ([
 
 // Update implements UniversalDao.Update.
 func (dao *UniversalDaoMongo) Update(bo *UniversalBo) (bool, error) {
-	numRows, err := dao.GdaoUpdate(dao.collectionName, dao.ToGenericBo(bo.Clone()))
+	numRows, err := dao.GdaoUpdate(dao.collectionName, dao.ToGenericBo(bo))
 	return numRows > 0, err
 }
 
@@ -189,6 +197,6 @@ func (dao *UniversalDaoMongo) Save(bo *UniversalBo) (bool, *UniversalBo, error) 
 	if err != nil {
 		return false, nil, err
 	}
-	numRows, err := dao.GdaoSave(dao.collectionName, dao.ToGenericBo(bo.Clone()))
+	numRows, err := dao.GdaoSave(dao.collectionName, dao.ToGenericBo(bo))
 	return numRows > 0, existing, err
 }

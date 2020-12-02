@@ -1,6 +1,7 @@
 package henge
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -51,6 +52,52 @@ func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu 
 	return prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException)
 }
 
+func buildRowMapperDynamodb(tableName string) godal.IRowMapper {
+	return &rowMapperDynamodb{wrap: &dynamodb.GenericRowMapperDynamodb{
+		ColumnsListMap: map[string][]string{tableName: {FieldId}},
+	}}
+}
+
+// rowMapperDynamodb is an implementation of godal.IRowMapper specific for AWS DynamoDB.
+type rowMapperDynamodb struct {
+	wrap godal.IRowMapper
+}
+
+// ToRow implements godal.IRowMapper.ToRow
+func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
+	row, err := r.wrap.ToRow(storageId, bo)
+	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
+		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
+		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
+		m[FieldData], _ = bo.GboGetAttrUnmarshalJson(FieldData) // Note: FieldData must be JSON-encoded string!
+	}
+	return row, err
+}
+
+// ToBo implements godal.IRowMapper.ToBo
+func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
+	gbo, err := r.wrap.ToBo(storageId, row)
+	if err == nil && gbo != nil {
+		if data, err := gbo.GboGetAttr(FieldData, nil); err == nil {
+			// Note: convert 'data' column from row to JSON-encoded string before storing to FieldData
+			if str, ok := data.(string); ok {
+				gbo.GboSetAttr(FieldData, str)
+			} else if bytes, ok := data.([]byte); ok {
+				gbo.GboSetAttr(FieldData, string(bytes))
+			} else {
+				js, _ := json.Marshal(data)
+				gbo.GboSetAttr(FieldData, string(js))
+			}
+		}
+	}
+	return gbo, err
+}
+
+// ColumnsList implements godal.IRowMapper.ColumnsList
+func (r *rowMapperDynamodb) ColumnsList(storageId string) []string {
+	return r.wrap.ColumnsList(storageId)
+}
+
 // NewUniversalDaoDynamodb is helper method to create UniversalDaoDynamodb instance.
 //
 // - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
@@ -63,9 +110,7 @@ func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, uid
 		uidxHf2:       checksum.Md5HashFunc,
 	}
 	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
-	dao.SetRowMapper(&dynamodb.GenericRowMapperDynamodb{
-		ColumnsListMap: map[string][]string{tableName: {FieldId}},
-	})
+	dao.SetRowMapper(buildRowMapperDynamodb(tableName))
 	return dao
 }
 
@@ -163,7 +208,7 @@ func (dao *UniversalDaoDynamodb) ToUniversalBo(gbo godal.IGenericBo) *UniversalB
 	for _, field := range topLevelFieldList {
 		delete(extraFields, field)
 	}
-	return &UniversalBo{
+	bo := &UniversalBo{
 		id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
 		dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
 		checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
@@ -172,6 +217,7 @@ func (dao *UniversalDaoDynamodb) ToUniversalBo(gbo godal.IGenericBo) *UniversalB
 		tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
 		_extraAttrs: extraFields,
 	}
+	return bo
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.
@@ -179,6 +225,7 @@ func (dao *UniversalDaoDynamodb) ToGenericBo(ubo *UniversalBo) godal.IGenericBo 
 	if ubo == nil {
 		return nil
 	}
+	ubo = ubo.Clone()
 	gbo := godal.NewGenericBo()
 	gbo.GboSetAttr(FieldId, ubo.id)
 	gbo.GboSetAttr(FieldData, ubo.dataJson)
@@ -194,7 +241,7 @@ func (dao *UniversalDaoDynamodb) ToGenericBo(ubo *UniversalBo) godal.IGenericBo 
 
 // Delete implements UniversalDao.Delete.
 func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
-	gbo := dao.ToGenericBo(bo.Clone())
+	gbo := dao.ToGenericBo(bo)
 	if dao.uidxAttrs == nil || len(dao.uidxAttrs) == 0 {
 		// go the easy way if there is no unique index
 		numRows, err := dao.GdaoDelete(dao.tableName, gbo)
@@ -248,7 +295,7 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 
 // Create implements UniversalDao.Create.
 func (dao *UniversalDaoDynamodb) Create(bo *UniversalBo) (bool, error) {
-	gbo := dao.ToGenericBo(bo.Clone())
+	gbo := dao.ToGenericBo(bo)
 	if dao.uidxAttrs == nil || len(dao.uidxAttrs) == 0 {
 		// go the easy way if there is no unique index
 		numRows, err := dao.GdaoCreate(dao.tableName, gbo)
@@ -332,7 +379,7 @@ func (dao *UniversalDaoDynamodb) GetAll(filter interface{}, sorting interface{})
 
 // Update implements UniversalDao.Update.
 func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
-	gbo := dao.ToGenericBo(bo.Clone())
+	gbo := dao.ToGenericBo(bo)
 	if dao.uidxAttrs == nil || len(dao.uidxAttrs) == 0 {
 		// go the easy way if there is no unique index
 		numRows, err := dao.GdaoUpdate(dao.tableName, gbo)
@@ -427,7 +474,7 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 		return false, nil, err
 	}
 
-	gbo := dao.ToGenericBo(bo.Clone())
+	gbo := dao.ToGenericBo(bo)
 	if dao.uidxAttrs == nil || len(dao.uidxAttrs) == 0 {
 		// go the easy way if there is no unique index
 		numRows, err := dao.GdaoSave(dao.tableName, gbo)

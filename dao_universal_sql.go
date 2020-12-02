@@ -113,6 +113,7 @@ func (dao *UniversalDaoSql) ToGenericBo(ubo *UniversalBo) godal.IGenericBo {
 	if ubo == nil {
 		return nil
 	}
+	ubo = ubo.Clone()
 	gbo := godal.NewGenericBo()
 	gbo.GboSetAttr(FieldId, ubo.id)
 	gbo.GboSetAttr(FieldData, ubo.dataJson)
@@ -134,7 +135,7 @@ func (dao *UniversalDaoSql) Delete(bo *UniversalBo) (bool, error) {
 
 // Create implements UniversalDao.Create.
 func (dao *UniversalDaoSql) Create(bo *UniversalBo) (bool, error) {
-	numRows, err := dao.GdaoCreate(dao.tableName, dao.ToGenericBo(bo.Clone()))
+	numRows, err := dao.GdaoCreate(dao.tableName, dao.ToGenericBo(bo))
 	return numRows > 0, err
 }
 
@@ -172,7 +173,7 @@ func (dao *UniversalDaoSql) GetAll(filter interface{}, sorting interface{}) ([]*
 
 // Update implements UniversalDao.Update.
 func (dao *UniversalDaoSql) Update(bo *UniversalBo) (bool, error) {
-	numRows, err := dao.GdaoUpdate(dao.tableName, dao.ToGenericBo(bo.Clone()))
+	numRows, err := dao.GdaoUpdate(dao.tableName, dao.ToGenericBo(bo))
 	return numRows > 0, err
 }
 
@@ -182,6 +183,6 @@ func (dao *UniversalDaoSql) Save(bo *UniversalBo) (bool, *UniversalBo, error) {
 	if err != nil {
 		return false, nil, err
 	}
-	numRows, err := dao.GdaoSave(dao.tableName, dao.ToGenericBo(bo.Clone()))
+	numRows, err := dao.GdaoSave(dao.tableName, dao.ToGenericBo(bo))
 	return numRows > 0, existing, err
 }

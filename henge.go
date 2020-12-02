@@ -106,7 +106,7 @@ const (
 	FieldExtras = "_ext"
 
 	// TimeLayout is used to convert datetime values to strings and vice versa.
-	TimeLayout = "2006-01-02T15:04:05.999999999-07:00"
+	TimeLayout = time.RFC3339Nano
 )
 
 var (
