@@ -29,7 +29,11 @@ func _testMongoInitMongoConnect(t *testing.T, testName, collectionName string) *
 	if mongoDb == "" {
 		mongoDb = "test"
 	}
-	mc, err := prom.NewMongoConnect(mongoUrl, mongoDb, 10000)
+	mc, err := prom.NewMongoConnectWithPoolOptions(mongoUrl, mongoDb, 10000, &prom.MongoPoolOpts{
+		ConnectTimeout:         10 * time.Second,
+		SocketTimeout:          10 * time.Second,
+		ServerSelectionTimeout: 10 * time.Second,
+	})
 	if err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "NewMongoConnect", err)
 	}
