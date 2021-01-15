@@ -101,7 +101,10 @@ func TestInitDynamodbTable(t *testing.T) {
 	if ok, err := adc.HasTable(nil, tableName+AwsDynamodbUidxTableSuffix); err != nil || ok {
 		t.Fatalf("%s failed: error [%s] or table [%s] exist", name, err, tableName+AwsDynamodbUidxTableSuffix)
 	}
-	if err := InitDynamodbTable(adc, tableName, awsDynamodbRCU, awsDynamodbWCU); err != nil {
+	if err := InitDynamodbTables(adc, tableName, &HengeDynamodbTablesSpec{
+		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
+		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
+	}); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 	if ok, err := adc.HasTable(nil, tableName); err != nil || !ok {
@@ -115,7 +118,10 @@ func TestInitDynamodbTable(t *testing.T) {
 
 func _testDynamodbInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName string, uidxIndexes [][]string) UniversalDao {
 	_cleanupDynamodb(adc, tableName)
-	if err := InitDynamodbTable(adc, tableName, awsDynamodbRCU, awsDynamodbWCU); err != nil {
+	if err := InitDynamodbTables(adc, tableName, &HengeDynamodbTablesSpec{
+		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
+		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
+	}); err != nil {
 		t.Fatalf("%s failed: %s", testName, err)
 	}
 	return NewUniversalDaoDynamodb(adc, tableName, uidxIndexes)

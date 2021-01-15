@@ -34,6 +34,8 @@ const (
 // - The secondary table will be created with the same RCU/WCU and has the following schema:
 //   { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
 // - Other than the two tables, no local index or global index is created.
+//
+// Deprecated: since v0.3.0, use InitDynamodbTables instead.
 func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu int64) error {
 	attrDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsAttrTypeString}}
 	pkDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsKeyTypePartition}}
@@ -50,6 +52,54 @@ func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu 
 	}
 	err = adc.CreateTable(nil, tableName+AwsDynamodbUidxTableSuffix, rcu, wcu, attrDefs, pkDefs)
 	return prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException)
+}
+
+// HengeDynamodbTablesSpec holds specification of DynamoDB tables to be created.
+//
+// Available: since v0.3.0
+type HengeDynamodbTablesSpec struct {
+	MainTableRcu    int64 // rcu of the main table
+	MainTableWcu    int64 // wcu of the main table
+	CreateUidxTable bool  // if true, the secondary table is created
+	UidxTableRcu    int64 // rcu of the secondary table
+	UidxTableWcu    int64 // wcu of the secondary table
+}
+
+// InitDynamodbTables initializes a DynamoDB table(s) to store henge business objects:
+//
+//   - The main table to store business objects.
+//   - The secondary table is used to manage unique indexes. The secondary table has the same base name and suffixed by AwsDynamodbUidxTableSuffix.
+//   - The secondary table has the following schema: { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
+//   - Other than the two tables, no local index or global index is created.
+//
+// Available: since v0.3.0
+func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *HengeDynamodbTablesSpec) error {
+	if spec == nil {
+		return errors.New("table spec is nil")
+	}
+	attrDefs := []prom.AwsDynamodbNameAndType{{Name: FieldId, Type: prom.AwsAttrTypeString}}
+	pkDefs := []prom.AwsDynamodbNameAndType{{Name: FieldId, Type: prom.AwsKeyTypePartition}}
+	err := adc.CreateTable(nil, tableName, spec.MainTableRcu, spec.MainTableWcu, attrDefs, pkDefs)
+	if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException); err != nil {
+		return err
+	}
+
+	if spec.CreateUidxTable {
+		attrDefs = []prom.AwsDynamodbNameAndType{
+			{Name: AwsDynamodbUidxTableColName, Type: prom.AwsAttrTypeString},
+			{Name: AwsDynamodbUidxTableColHash, Type: prom.AwsAttrTypeString},
+		}
+		pkDefs = []prom.AwsDynamodbNameAndType{
+			{Name: AwsDynamodbUidxTableColName, Type: prom.AwsKeyTypePartition},
+			{Name: AwsDynamodbUidxTableColHash, Type: prom.AwsKeyTypeSort},
+		}
+		err = adc.CreateTable(nil, tableName+AwsDynamodbUidxTableSuffix, spec.UidxTableRcu, spec.UidxTableWcu, attrDefs, pkDefs)
+		if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func buildRowMapperDynamodb(tableName string) godal.IRowMapper {

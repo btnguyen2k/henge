@@ -1,5 +1,9 @@
 # henge release notes
 
+## 2021-01-xx - v0.3.0
+
+- Function `InitDynamodbTable` is deprecated, use `InitDynamodbTables` instead.
+
 ## 2020-12-02 - v0.2.2
 
 - Store `zdata` field to DynamoDB as object.
