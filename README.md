@@ -4,10 +4,9 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/btnguyen2k/henge)](https://pkg.go.dev/github.com/btnguyen2k/henge)
 [![Actions Status](https://github.com/btnguyen2k/henge/workflows/Henge/badge.svg)](https://github.com/btnguyen2k/henge/actions)
 [![codecov](https://codecov.io/gh/btnguyen2k/henge/branch/main/graph/badge.svg?token=EF3O2PB9PQ)](https://codecov.io/gh/btnguyen2k/henge)
+[![Release](https://img.shields.io/github/release/btnguyen2k/henge.svg?style=flat-square)](RELEASE-NOTES.md)
 
-package henge is an out-of-the-box NoSQL style universal data access layer implementation.
-
-Latest release [v0.2.2](RELEASE-NOTES.md).
+An out-of-the-box NoSQL-style universal data access layer implementation for Go.
 
 ## Documentation
 
