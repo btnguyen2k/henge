@@ -19,7 +19,8 @@ At a glance, `henge` can fit into application's data access layers as illustrate
 
 **Data storage layer**
 
-`henge` provides a ready-to-use data storage layer that supports (since [v0.2.0](RELEASE-NOTES.md)):
+`henge` provides a ready-to-use data storage layer that supports (since [v0.3.0](RELEASE-NOTES.md)):
+- Azure Cosmos DB
 - AWS DynamoDB
 - MongoDB
 - MySQL
@@ -28,7 +29,7 @@ At a glance, `henge` can fit into application's data access layers as illustrate
 - Oracle
 - SQLite (for non-production only, i.e. testing, poc, demo)
 
-`henge` uses the following schema for data storage layer:
+`henge` uses the following schema for data storage layer (*):
 - Field/column `zid`: business object's unique id, implemented as primary key (for SQL storage) or partition key (for no-SQL storage).
   Its data type is VARCHAR or string (whichever is best fit with the underlying data store).
 - Field/column `zdata`: store business object's member values. Its data type is TEXT, CLOB, JSONB or string (whichever is best fit with the underlying data store).
@@ -36,7 +37,9 @@ At a glance, `henge` can fit into application's data access layers as illustrate
 - Field/column `ztcreated` and `ztupdated`: timestamp when business object is created/last updated. Its data type is DATETIME, TIMESTAMP or string (whichever is best fit with the underlying data store).
 - Field/column `ztversion`: for application's internal use (can be used for compatibility check or data migration). Its data type is BIGINT, INT or number (whichever is best fit with the underlying data store).
 
-`henge` also allow application to define its own fields/columns.
+_(*) column names and data types may differ depends on the underlying data store._
+
+`henge` also allows application to define its own fields/columns.
 
 **"Universal" Business Object (BO) and Data Access Object (DAO) implementations**
 
@@ -46,11 +49,12 @@ At a glance, `henge` can fit into application's data access layers as illustrate
   - `UniversalDaoDynamodb`: AWS DynamoDB-specific implementation, use [github.com/aws/aws-sdk-go](https://github.com/aws/aws-sdk-go) to access AWS DynamoDB.
   - `UniversalDaoMongo`: MongoDB-specific implementation, use [go.mongodb.org/mongo-driver/mongo](https://go.mongodb.org/mongo-driver/mongo) to access MongoDB server/cluster.
   - `UniversalDaoSql`: SQL-specific implementation. Since [v0.2.0](RELEASE-NOTES.md), `henge` supports the following database systems:
-    - MSSQL: uses driver [github.com/denisenkom/go-mssqldb](https://github.com/denisenkom/go-mssqldb)
-    - MySQL: uses driver [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql)
-    - Oracle: uses driver [github.com/godror/godror](https://github.com/godror/godror)
-    - PostgreSQL: uses driver [github.com/jackc/pgx](https://github.com/jackc/pgx)
-    - SQLite: uses driver [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3)
+    - MSSQL: use driver [github.com/denisenkom/go-mssqldb](https://github.com/denisenkom/go-mssqldb)
+    - MySQL: use driver [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql)
+    - Oracle: use driver [github.com/godror/godror](https://github.com/godror/godror)
+    - PostgreSQL: use driver [github.com/jackc/pgx](https://github.com/jackc/pgx)
+    - SQLite: use driver [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3)
+  - `UniversalDaoCosmosdb`: (since [v0.3.0](RELEASE-NOTES.md)) Azure Cosmos DB-specific implementation, built on top `UniversalDaoSql`, use driver [github.com/btnguyen2k/gocossmos](https://github.com/btnguyen2k/gocossmos).
 
 **(Optional) Custom Business Object (BO) and Data Access Object (DAO) implementations**
 

@@ -28,12 +28,11 @@ const (
 )
 
 // InitDynamodbTable initializes a DynamoDB table to store henge business objects.
-//
-// - This function will create 2 tables. Main table with name <tableName> to store business objects. The secondary table
-//   has the same base name and suffixed by AwsDynamodbUidxTableSuffix. The secondary table is used to manage unique indexes.
-// - The secondary table will be created with the same RCU/WCU and has the following schema:
-//   { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
-// - Other than the two tables, no local index or global index is created.
+//   - This function will create 2 tables. Main table with name <tableName> to store business objects. The secondary table
+//     has the same base name and suffixed by AwsDynamodbUidxTableSuffix. The secondary table is used to manage unique indexes.
+//   - The secondary table will be created with the same RCU/WCU and has the following schema:
+//     { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
+//   - Other than the two tables, no local index or global index is created.
 //
 // Deprecated: since v0.3.0, use InitDynamodbTables instead.
 func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu int64) error {
@@ -65,8 +64,7 @@ type HengeDynamodbTablesSpec struct {
 	UidxTableWcu    int64 // wcu of the secondary table
 }
 
-// InitDynamodbTables initializes a DynamoDB table(s) to store henge business objects:
-//
+// InitDynamodbTables initializes a DynamoDB table(s) to store henge business objects.
 //   - The main table to store business objects.
 //   - The secondary table is used to manage unique indexes. The secondary table has the same base name and suffixed by AwsDynamodbUidxTableSuffix.
 //   - The secondary table has the following schema: { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
@@ -113,7 +111,7 @@ type rowMapperDynamodb struct {
 	wrap godal.IRowMapper
 }
 
-// ToRow implements godal.IRowMapper.ToRow
+// ToRow implements godal.IRowMapper.ToRow.
 func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
 	row, err := r.wrap.ToRow(storageId, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
@@ -124,7 +122,7 @@ func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interf
 	return row, err
 }
 
-// ToBo implements godal.IRowMapper.ToBo
+// ToBo implements godal.IRowMapper.ToBo.
 func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
 	gbo, err := r.wrap.ToBo(storageId, row)
 	if err == nil && gbo != nil {
@@ -143,14 +141,13 @@ func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGene
 	return gbo, err
 }
 
-// ColumnsList implements godal.IRowMapper.ColumnsList
+// ColumnsList implements godal.IRowMapper.ColumnsList.
 func (r *rowMapperDynamodb) ColumnsList(storageId string) []string {
 	return r.wrap.ColumnsList(storageId)
 }
 
 // NewUniversalDaoDynamodb is helper method to create UniversalDaoDynamodb instance.
-//
-// - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
+//   - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
 func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, uidxAttrs [][]string) UniversalDao {
 	dao := &UniversalDaoDynamodb{
 		tableName:     tableName,
@@ -221,7 +218,7 @@ func (dao *UniversalDaoDynamodb) SetUidxHashFunctions(uidxHashFuncs []checksum.H
 
 // BuildUidxValues calculate unique index hash value from a godal.IGenericBo.
 //
-// The return value is a map {uidxName:uidxHashValue}
+// The return value is a map {uidxName:uidxHashValue}.
 func (dao *UniversalDaoDynamodb) BuildUidxValues(bo godal.IGenericBo) map[string]string {
 	if dao.uidxAttrs == nil || len(dao.uidxAttrs) == 0 || bo == nil {
 		return nil
