@@ -114,7 +114,7 @@ func defaultFilterGeneratorSql(_ string, input interface{}) interface{} {
 		return map[string]interface{}{SqlColId: bo.id}
 	}
 	if gbo, ok := input.(godal.IGenericBo); ok {
-		return map[string]interface{}{CosmosdbColId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+		return map[string]interface{}{SqlColId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
 	}
 	return input
 }
