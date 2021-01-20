@@ -4,108 +4,110 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/btnguyen2k/consu/reddo"
+	_ "github.com/btnguyen2k/gocosmos"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/sql"
 	"github.com/btnguyen2k/prom"
-	_ "github.com/mattn/go-sqlite3"
 )
 
-func _cleanupSqlite(dir string) error {
-	return os.RemoveAll(dir)
+func _cleanupCosmosdb(sqlc *prom.SqlConnect, tableName string) error {
+	_, err := sqlc.GetDB().Exec(fmt.Sprintf("DROP COLLECTION IF EXISTS %s", tableName))
+	return err
 }
 
-func _testSqliteInitSqlConnect(t *testing.T, testName string) *prom.SqlConnect {
-	driver := strings.ReplaceAll(os.Getenv("SQLITE_DRIVER"), `"`, "")
-	url := strings.ReplaceAll(os.Getenv("SQLITE_URL"), `"`, "")
+func _testCosmosdbInitSqlConnect(t *testing.T, testName, tableName string) *prom.SqlConnect {
+	driver := strings.ReplaceAll(os.Getenv("COSMOSDB_DRIVER"), `"`, "")
+	url := strings.ReplaceAll(os.Getenv("COSMOSDB_URL"), `"`, "")
 	if driver == "" || url == "" {
 		t.Skipf("%s skipped", testName)
 		return nil
 	}
 	timezone := strings.ReplaceAll(os.Getenv("TIMEZONE"), `"`, "")
 	if timezone == "" {
-		timezone = "Asia/Ho_Chi_Minh"
+		timezone = "UTC"
 	}
 	urlTimezone := strings.ReplaceAll(timezone, "/", "%2f")
 	url = strings.ReplaceAll(url, "${loc}", urlTimezone)
 	url = strings.ReplaceAll(url, "${tz}", urlTimezone)
 	url = strings.ReplaceAll(url, "${timezone}", urlTimezone)
 
-	dbName := "tempdb"
-	if err := _cleanupSqlite(url); err != nil {
-		t.Fatalf("%s/%s failed: %s", testName, "_cleanupSqlite", err)
-	}
-	sqlc, err := NewSqliteConnection(url, dbName, timezone, driver, 10000, nil)
+	url += ";Db=henge"
+
+	sqlc, err := NewCosmosdbConnection(url, timezone, driver, 10000, nil)
 	if err != nil {
-		t.Fatalf("%s/%s failed: %s", testName, "NewSqliteConnection", err)
+		t.Fatalf("%s/%s failed: %s", testName, "NewCosmosdbConnection", err)
 	}
+	if err := _cleanupCosmosdb(sqlc, tableName); err != nil {
+		t.Fatalf("%s/%s failed: %s", testName, "_cleanupCosmosdb", err)
+	}
+
+	sqlc.GetDB().Exec("CREATE DATABASE henge WITH maxru=10000")
+
 	return sqlc
 }
 
-func TestNewSqliteConnection(t *testing.T) {
-	name := "TestNewSqliteConnection"
-	sqlc := _testSqliteInitSqlConnect(t, name)
+func TestNewCosmosdbConnection(t *testing.T) {
+	name := "TestNewCosmosdbConnection"
+	sqlc := _testCosmosdbInitSqlConnect(t, name, "table_temp")
 	defer sqlc.Close()
 }
 
-func TestInitSqliteTable(t *testing.T) {
-	name := "TestInitSqliteTable"
-	sqlc := _testSqliteInitSqlConnect(t, name)
-	defer sqlc.Close()
+func TestInitCosmosdbTable(t *testing.T) {
+	name := "TestInitCosmosdbTable"
 	tblName := "table_temp"
-	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
+	defer sqlc.Close()
 	for i := 0; i < 2; i++ {
-		if err := InitSqliteTable(sqlc, tblName, colDef); err != nil {
+		if err := InitCosmosdbCollection(sqlc, tblName, "id", 0, 0, nil); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
 		}
 	}
 }
 
-func TestCreateIndexSqlite(t *testing.T) {
-	name := "TestCreateIndexSqlite"
-	sqlc := _testSqliteInitSqlConnect(t, name)
-	defer sqlc.Close()
-	tblName := "table_temp"
-	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
-	if err := InitSqliteTable(sqlc, tblName, colDef); err != nil {
+// func TestCreateIndexPgsql(t *testing.T) {
+// 	name := "TestCreateIndexPgsql"
+// 	tblName := "table_temp"
+// 	sqlc := _testPgsqlInitSqlConnect(t, name, tblName)
+// 	defer sqlc.Close()
+// 	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
+// 	if err := InitPgsqlTable(sqlc, tblName, colDef); err != nil {
+// 		t.Fatalf("%s failed: %s", name, err)
+// 	}
+// 	if err := CreateIndexSql(sqlc, tblName, true, []string{"col_email"}); err != nil {
+// 		t.Fatalf("%s failed: %s", name, err)
+// 	}
+// 	if err := CreateIndexSql(sqlc, tblName, false, []string{"col_age"}); err != nil {
+// 		t.Fatalf("%s failed: %s", name, err)
+// 	}
+// }
+
+const (
+	colCosmosdbPk = "type"
+)
+
+func _testCosmosdbInit(t *testing.T, name, tblName string) (*prom.SqlConnect, UniversalDao) {
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
+	if err := InitCosmosdbCollection(sqlc, tblName, colCosmosdbPk, 0, 0, [][]string{{"/email"}}); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	}
-	if err := CreateIndexSql(sqlc, tblName, true, []string{"col_email"}); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	}
-	if err := CreateIndexSql(sqlc, tblName, false, []string{"col_age"}); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	}
+	dao := NewUniversalDaoCosmosdbSql(sqlc, tblName, colCosmosdbPk, true)
+
+	return sqlc, dao
 }
 
-func _testSqliteInit(t *testing.T, name, tblName string) (*prom.SqlConnect, UniversalDao) {
-	sqlc := _testSqliteInitSqlConnect(t, name)
-	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
-	if err := InitSqliteTable(sqlc, tblName, colDef); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	}
-	if err := CreateIndexSql(sqlc, tblName, true, []string{"col_email"}); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	}
-	if err := CreateIndexSql(sqlc, tblName, false, []string{"col_age"}); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	}
-	extraColNameToFieldMappings := map[string]string{"col_email": "email", "col_age": "age"}
-	return sqlc, NewUniversalDaoSql(sqlc, tblName, true, extraColNameToFieldMappings)
-}
-
-func TestSqlite_Create(t *testing.T) {
-	name := "TestSqlite_Create"
+func TestCosmosdb_Create(t *testing.T) {
+	name := "TestCosmosdb_Create"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -118,23 +120,13 @@ func TestSqlite_Create(t *testing.T) {
 	}
 }
 
-func _isErrorDuplicatedEntrySqlite(err error) bool {
-	if err == godal.GdaoErrorDuplicatedEntry {
-		return true
-	}
-	errStr := fmt.Sprintf("%e", err)
-	// fmt.Printf("%#e\n", err)
-	return regexp.MustCompile(`\WErrNo=19\W`).FindString(errStr) != "" &&
-		(regexp.MustCompile(`\WErrNoExtended=1555\W`).FindString(errStr) != "" ||
-			regexp.MustCompile(`\WErrNoExtended=2067\W`).FindString(errStr) != "")
-}
-
-func TestSqlite_CreateExistingPK(t *testing.T) {
-	name := "TestSqlite_CreateExistingPK"
+func TestCosmosdb_CreateExistingPK(t *testing.T) {
+	name := "TestCosmosdb_CreateExistingPK"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -147,19 +139,20 @@ func TestSqlite_CreateExistingPK(t *testing.T) {
 	}
 
 	ubo.SetExtraAttr("email", "myname2@mydomain.com")
-	if ok, err := dao.Create(ubo); !_isErrorDuplicatedEntrySqlite(err) {
+	if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
 		t.Fatalf("%s failed: record should not be created twice", name)
 	}
 }
 
-func TestSqlite_CreateExistingUnique(t *testing.T) {
-	name := "TestSqlite_CreateExistingUnique"
+func TestCosmosdb_CreateExistingUnique(t *testing.T) {
+	name := "TestCosmosdb_CreateExistingUnique"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -172,19 +165,20 @@ func TestSqlite_CreateExistingUnique(t *testing.T) {
 	}
 
 	ubo.SetId("id2")
-	if ok, err := dao.Create(ubo); !_isErrorDuplicatedEntrySqlite(err) {
+	if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
 		t.Fatalf("%s failed: record should not be created twice", name)
 	}
 }
 
-func TestSqlite_CreateGet(t *testing.T) {
-	name := "TestSqlite_CreateGet"
+func TestCosmosdb_CreateGet(t *testing.T) {
+	name := "TestCosmosdb_CreateGet"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -219,12 +213,13 @@ func TestSqlite_CreateGet(t *testing.T) {
 	}
 }
 
-func TestSqlite_CreateDelete(t *testing.T) {
-	name := "TestSqlite_CreateDelete"
+func TestCosmosdb_CreateDelete(t *testing.T) {
+	name := "TestCosmosdb_CreateDelete"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -255,10 +250,10 @@ func TestSqlite_CreateDelete(t *testing.T) {
 	}
 }
 
-func TestSqlite_CreateGetMany(t *testing.T) {
-	name := "TestSqlite_CreateGetMany"
+func TestCosmosdb_CreateGetMany(t *testing.T) {
+	name := "TestCosmosdb_CreateGetMany"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -269,6 +264,7 @@ func TestSqlite_CreateGetMany(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
+		ubo.SetExtraAttr(colCosmosdbPk, "users")
 		ubo.SetDataAttr("name.first", strconv.Itoa(i))
 		ubo.SetDataAttr("name.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
@@ -287,10 +283,10 @@ func TestSqlite_CreateGetMany(t *testing.T) {
 	}
 }
 
-func TestSqlite_CreateGetManyWithFilter(t *testing.T) {
-	name := "TestSqlite_CreateGetManyWithFilter"
+func TestCosmosdb_CreateGetManyWithFilter(t *testing.T) {
+	name := "TestCosmosdb_CreateGetManyWithFilter"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -301,6 +297,7 @@ func TestSqlite_CreateGetManyWithFilter(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
+		ubo.SetExtraAttr(colCosmosdbPk, "users")
 		ubo.SetDataAttr("name.first", strconv.Itoa(i))
 		ubo.SetDataAttr("name.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
@@ -312,7 +309,7 @@ func TestSqlite_CreateGetManyWithFilter(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_age", Operation: ">=", Value: 35 + 3}
+	filter := &sql.FilterFieldValue{Field: "age", Operation: ">=", Value: 35 + 3}
 	if boList, err := dao.GetAll(filter, nil); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 7 {
@@ -320,10 +317,10 @@ func TestSqlite_CreateGetManyWithFilter(t *testing.T) {
 	}
 }
 
-func TestSqlite_CreateGetManyWithSorting(t *testing.T) {
-	name := "TestSqlite_CreateGetManyWithSorting"
+func TestCosmosdb_CreateGetManyWithSorting(t *testing.T) {
+	name := "TestCosmosdb_CreateGetManyWithSorting"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -334,6 +331,7 @@ func TestSqlite_CreateGetManyWithSorting(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
+		ubo.SetExtraAttr(colCosmosdbPk, "users")
 		ubo.SetDataAttr("name.first", strconv.Itoa(i))
 		ubo.SetDataAttr("name.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
@@ -345,7 +343,7 @@ func TestSqlite_CreateGetManyWithSorting(t *testing.T) {
 		}
 	}
 
-	sorting := map[string]string{"col_email": "desc"}
+	sorting := map[string]string{"email": "desc"}
 	if boList, err := dao.GetAll(nil, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else {
@@ -357,10 +355,10 @@ func TestSqlite_CreateGetManyWithSorting(t *testing.T) {
 	}
 }
 
-func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
-	name := "TestSqlite_CreateGetManyWithFilterAndSorting"
+func TestCosmosdb_CreateGetManyWithFilterAndSorting(t *testing.T) {
+	name := "TestCosmosdb_CreateGetManyWithFilterAndSorting"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 
 	idList := make([]string, 0)
@@ -371,6 +369,7 @@ func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
+		ubo.SetExtraAttr(colCosmosdbPk, "users")
 		ubo.SetDataAttr("name.first", strconv.Itoa(i))
 		ubo.SetDataAttr("name.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
@@ -382,8 +381,8 @@ func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_email", Operation: "<", Value: "3@mydomain.com"}
-	sorting := map[string]string{"col_email": "desc"}
+	filter := &sql.FilterFieldValue{Field: "email", Operation: "<", Value: "3@mydomain.com"}
+	sorting := map[string]string{"email": "desc"}
 	if boList, err := dao.GetAll(filter, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 3 {
@@ -395,17 +394,55 @@ func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
 	}
 }
 
-// currently godal does not support SQLite flavor!
-func TestSqlite_CreateGetManyWithSortingAndPaging(t *testing.T) {
-	// name := "TestSqlite_CreateGetManyWithSortingAndPaging"
+func TestCosmosdb_CreateGetManyWithSortingAndPaging(t *testing.T) {
+	name := "TestCosmosdb_CreateGetManyWithSortingAndPaging"
+	tblName := "table_temp"
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	defer sqlc.Close()
+
+	idList := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		idList = append(idList, strconv.Itoa(i))
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+	for i := 0; i < 10; i++ {
+		ubo := NewUniversalBo(idList[i], uint64(i))
+		ubo.SetExtraAttr(colCosmosdbPk, "users")
+		ubo.SetDataAttr("name.first", strconv.Itoa(i))
+		ubo.SetDataAttr("name.last", "Nguyen")
+		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+		ubo.SetExtraAttr("age", 35+i)
+		if ok, err := dao.Create(ubo); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if !ok {
+			t.Fatalf("%s failed: cannot create record", name)
+		}
+	}
+
+	fromOffset := 3
+	numRows := 4
+	sorting := map[string]string{"email": "desc"}
+	if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(boList) != numRows {
+		t.Fatalf("%s failed: expected %#v items but received %#v", name, numRows, len(boList))
+	} else {
+		for i := 0; i < numRows; i++ {
+			if boList[i].GetId() != strconv.Itoa(9-i-fromOffset) {
+				t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(9-i-fromOffset), boList[i].GetId())
+			}
+		}
+	}
 }
 
-func TestSqlite_Update(t *testing.T) {
-	name := "TestSqlite_Update"
+func TestCosmosdb_Update(t *testing.T) {
+	name := "TestCosmosdb_Update"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -448,12 +485,13 @@ func TestSqlite_Update(t *testing.T) {
 	}
 }
 
-func TestSqlite_UpdateNotExist(t *testing.T) {
-	name := "TestSqlite_UpdateNotExist"
+func TestCosmosdb_UpdateNotExist(t *testing.T) {
+	name := "TestCosmosdb_UpdateNotExist"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -466,13 +504,14 @@ func TestSqlite_UpdateNotExist(t *testing.T) {
 	}
 }
 
-func TestSqlite_UpdateDuplicated(t *testing.T) {
-	name := "TestSqlite_UpdateDuplicated"
+func TestCosmosdb_UpdateDuplicated(t *testing.T) {
+	name := "TestCosmosdb_UpdateDuplicated"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 
 	ubo1 := NewUniversalBo("1", 1357)
+	ubo1.SetExtraAttr(colCosmosdbPk, "users")
 	ubo1.SetDataAttr("name.first", "Thanh")
 	ubo1.SetDataAttr("name.last", "Nguyen")
 	ubo1.SetExtraAttr("email", "1@mydomain.com")
@@ -481,6 +520,7 @@ func TestSqlite_UpdateDuplicated(t *testing.T) {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 	ubo2 := NewUniversalBo("2", 1357)
+	ubo2.SetExtraAttr(colCosmosdbPk, "users")
 	ubo2.SetDataAttr("name.first", "Thanh2")
 	ubo2.SetDataAttr("name.last", "Nguyen2")
 	ubo2.SetExtraAttr("email", "2@mydomain.com")
@@ -490,17 +530,18 @@ func TestSqlite_UpdateDuplicated(t *testing.T) {
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, err := dao.Update(ubo1); !_isErrorDuplicatedEntrySqlite(err) {
+	if _, err := dao.Update(ubo1); err != godal.GdaoErrorDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }
 
-func TestSqlite_SaveNew(t *testing.T) {
-	name := "TestSqlite_SaveNew"
+func TestCosmosdb_SaveNew(t *testing.T) {
+	name := "TestCosmosdb_SaveNew"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -537,12 +578,13 @@ func TestSqlite_SaveNew(t *testing.T) {
 	}
 }
 
-func TestSqlite_SaveExisting(t *testing.T) {
-	name := "TestSqlite_SaveExisting"
+func TestCosmosdb_SaveExisting(t *testing.T) {
+	name := "TestCosmosdb_SaveExisting"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo := NewUniversalBo("id", 1357)
+	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
 	ubo.SetDataAttr("name.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
@@ -603,12 +645,13 @@ func TestSqlite_SaveExisting(t *testing.T) {
 	}
 }
 
-func TestSqlite_SaveExistingUnique(t *testing.T) {
-	name := "TestSqlite_SaveExistingUnique"
+func TestCosmosdb_SaveExistingUnique(t *testing.T) {
+	name := "TestCosmosdb_SaveExistingUnique"
 	tblName := "table_temp"
-	sqlc, dao := _testSqliteInit(t, name, tblName)
+	sqlc, dao := _testCosmosdbInit(t, name, tblName)
 	defer sqlc.Close()
 	ubo1 := NewUniversalBo("1", 1357)
+	ubo1.SetExtraAttr(colCosmosdbPk, "users")
 	ubo1.SetDataAttr("name.first", "Thanh1")
 	ubo1.SetDataAttr("name.last", "Nguyen1")
 	ubo1.SetExtraAttr("email", "1@mydomain.com")
@@ -617,6 +660,7 @@ func TestSqlite_SaveExistingUnique(t *testing.T) {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 	ubo2 := NewUniversalBo("2", 1357)
+	ubo2.SetExtraAttr(colCosmosdbPk, "users")
 	ubo2.SetDataAttr("name.first", "Thanh2")
 	ubo2.SetDataAttr("name.last", "Nguyen2")
 	ubo2.SetExtraAttr("email", "2@mydomain.com")
@@ -626,7 +670,7 @@ func TestSqlite_SaveExistingUnique(t *testing.T) {
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, _, err := dao.Save(ubo1); !_isErrorDuplicatedEntrySqlite(err) {
+	if _, _, err := dao.Save(ubo1); err != godal.GdaoErrorDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }

@@ -9,6 +9,26 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
+// NewSqlConnection is convenient function to create prom.SqlConnect instance.
+//
+// Note: it's application's responsibility to import proper SQL driver and supply the correct driver.
+//
+// Note: timezone is default to UTC if not supplied.
+//
+// Available: since v0.3.0
+func NewSqlConnection(url, timezone, driver string, dbFlavor prom.DbFlavor, defaultTimeoutMs int, poolOptions *prom.SqlPoolOptions) (*prom.SqlConnect, error) {
+	sqlc, err := prom.NewSqlConnect(driver, url, defaultTimeoutMs, poolOptions)
+	if err != nil {
+		return nil, err
+	}
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	sqlc.SetLocation(loc).SetDbFlavor(dbFlavor)
+	return sqlc, nil
+}
+
 func buildRowMapperSql(tableName string, extraColNameToFieldMappings map[string]string) godal.IRowMapper {
 	myCols := append([]string{}, sqlColumnNames...)
 	myMapFieldToColName := cloneMap(sqlMapFieldToColName)
@@ -27,17 +47,17 @@ func buildRowMapperSql(tableName string, extraColNameToFieldMappings map[string]
 }
 
 // NewUniversalDaoSql is helper method to create UniversalDaoSql instance.
-//
-// - txModeOnWrite: enables/disables transaction mode on write operations.
+//   - txModeOnWrite: enables/disables transaction mode on write operations.
 //       RDBMS/SQL's implementation of GdaoSave is "try update, if failed then insert".
 //       It can be done either in transaction (txModeOnWrite=true) or non-transaction (txModeOnWrite=false) mode.
 //       Recommended setting is "txModeOnWrite=true".
 func NewUniversalDaoSql(sqlc *prom.SqlConnect, tableName string, txModeOnWrite bool, extraColNameToFieldMappings map[string]string) UniversalDao {
 	dao := &UniversalDaoSql{tableName: tableName}
-	dao.GenericDaoSql = sql.NewGenericDaoSql(sqlc, godal.NewAbstractGenericDao(dao))
+	dao.IGenericDaoSql = sql.NewGenericDaoSql(sqlc, godal.NewAbstractGenericDao(dao))
 	dao.SetRowMapper(buildRowMapperSql(tableName, extraColNameToFieldMappings))
-	dao.SetSqlFlavor(sqlc.GetDbFlavor())
-	dao.SetTxModeOnWrite(txModeOnWrite)
+	dao.SetTxModeOnWrite(txModeOnWrite).SetSqlFlavor(sqlc.GetDbFlavor())
+	dao.funcFilterGeneratorSql = defaultFilterGeneratorSql
+	dao.defaultSorting = (&sql.GenericSorting{Flavor: sqlc.GetDbFlavor()}).Add(SqlColId)
 	return dao
 }
 
@@ -76,15 +96,43 @@ var (
 	}
 )
 
+// FuncFilterGeneratorSql defines an API to generate filter for universal BO, to be used with UniversalDaoSql.
+//
+// input can be either UniversalBo, *UniversalBo, godal.IGenericBo or an arbitrary filter instance.
+//
+// Available: since v0.3.0
+type FuncFilterGeneratorSql func(tableName string, input interface{}) interface{}
+
+// defaultFilterGeneratorSql is the default instance of FuncFilterGeneratorSql.
+func defaultFilterGeneratorSql(_ string, input interface{}) interface{} {
+	switch input.(type) {
+	case UniversalBo:
+		bo := input.(UniversalBo)
+		return map[string]interface{}{SqlColId: bo.id}
+	case *UniversalBo:
+		bo := input.(*UniversalBo)
+		return map[string]interface{}{SqlColId: bo.id}
+	}
+	if gbo, ok := input.(godal.IGenericBo); ok {
+		return map[string]interface{}{CosmosdbColId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+	}
+	return input
+}
+
 // UniversalDaoSql is SQL-based implementation of UniversalDao.
 type UniversalDaoSql struct {
-	*sql.GenericDaoSql
-	tableName string
+	sql.IGenericDaoSql
+	tableName              string
+	funcFilterGeneratorSql FuncFilterGeneratorSql
+	defaultSorting         sql.ISorting
 }
 
 // GdaoCreateFilter implements IGenericDao.GdaoCreateFilter.
-func (dao *UniversalDaoSql) GdaoCreateFilter(_ string, bo godal.IGenericBo) interface{} {
-	return map[string]interface{}{SqlColId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+func (dao *UniversalDaoSql) GdaoCreateFilter(tableName string, bo godal.IGenericBo) interface{} {
+	if dao.funcFilterGeneratorSql == nil {
+		dao.funcFilterGeneratorSql = defaultFilterGeneratorSql
+	}
+	return dao.funcFilterGeneratorSql(tableName, bo)
 }
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
@@ -141,7 +189,8 @@ func (dao *UniversalDaoSql) Create(bo *UniversalBo) (bool, error) {
 
 // Get implements UniversalDao.Get.
 func (dao *UniversalDaoSql) Get(id string) (*UniversalBo, error) {
-	gbo, err := dao.GdaoFetchOne(dao.tableName, map[string]interface{}{SqlColId: id})
+	filterBo := NewUniversalBo(id, 0)
+	gbo, err := dao.GdaoFetchOne(dao.tableName, dao.GdaoCreateFilter(dao.tableName, dao.ToGenericBo(filterBo)))
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +200,7 @@ func (dao *UniversalDaoSql) Get(id string) (*UniversalBo, error) {
 // GetN implements UniversalDao.GetN.
 func (dao *UniversalDaoSql) GetN(fromOffset, maxNumRows int, filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
 	if sorting == nil {
-		// default sorting: ascending by "id" column
-		sorting = (&sql.GenericSorting{Flavor: dao.GetSqlFlavor()}).Add(SqlColId)
+		sorting = dao.defaultSorting
 	}
 	gboList, err := dao.GdaoFetchMany(dao.tableName, filter, sorting, fromOffset, maxNumRows)
 	if err != nil {

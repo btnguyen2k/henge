@@ -8,9 +8,8 @@ import (
 )
 
 // CreateTableSql generates and executes "CREATE TABLE" SQL statement.
-//
-// - if ifNotExist is true the SQL statement will be generated as CREATE TABLE IF NOT EXISTS table-name...
-// - colDef is a map of {table-col-name:col-type} and must
+//   - if ifNotExist is true the SQL statement will be generated as CREATE TABLE IF NOT EXISTS table-name...
+//   - colDef is a map of {table-col-name:col-type} and must
 func CreateTableSql(sqlc *prom.SqlConnect, tableName string, ifNotExist bool, colDef map[string]string, colNames, pk []string) error {
 	template := "CREATE TABLE %s %s (%s%s)"
 	partIfNotExists := ""

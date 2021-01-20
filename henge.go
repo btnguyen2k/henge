@@ -156,8 +156,8 @@ var DefaultFuncPreUboToMap FuncPreUboToMap = func(_ubo *UniversalBo) map[string]
 }
 
 // ToMap exports the BO data to a map[string]interface{}.
-//  - preFunc is used to export BO data to a map. If not supplied, DefaultFuncPreUboToMap is used.
-//  - postFunc is used to transform the result map (output from preFunc) to the final result. If not supplied, the result from preFunc is returned as-is.
+//   - preFunc is used to export BO data to a map. If not supplied, DefaultFuncPreUboToMap is used.
+//   - postFunc is used to transform the result map (output from preFunc) to the final result. If not supplied, the result from preFunc is returned as-is.
 func (ubo *UniversalBo) ToMap(preFunc FuncPreUboToMap, postFunc FuncPostUboToMap) map[string]interface{} {
 	if preFunc == nil {
 		preFunc = DefaultFuncPreUboToMap

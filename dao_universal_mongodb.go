@@ -11,9 +11,8 @@ import (
 )
 
 // InitMongoCollection initializes a MongoDB collection to store henge business objects.
-//
-// - This function creates the specified collection with default settings.
-// - Other than the collection, no index is created.
+//   - This function creates the specified collection with default settings.
+//   - Other than the collection, no index is created.
 func InitMongoCollection(mc *prom.MongoConnect, collectionName string) error {
 	_, err := mc.CreateCollection(collectionName)
 	return err
@@ -28,12 +27,14 @@ type rowMapperMongo struct {
 	wrap godal.IRowMapper
 }
 
-// ToRow implements godal.IRowMapper.ToRow
+// ToRow implements godal.IRowMapper.ToRow.
 func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
 	row, err := r.wrap.ToRow(storageId, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
 		m[MongoColId] = m[FieldId]
-		delete(m, FieldId)
+		if MongoColId != FieldId {
+			delete(m, FieldId)
+		}
 		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
 		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
 		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
@@ -42,7 +43,7 @@ func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface
 	return row, err
 }
 
-// ToBo implements godal.IRowMapper.ToBo
+// ToBo implements godal.IRowMapper.ToBo.
 func (r *rowMapperMongo) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
 	gbo, err := r.wrap.ToBo(storageId, row)
 	if err == nil && gbo != nil {
@@ -65,14 +66,13 @@ func (r *rowMapperMongo) ToBo(storageId string, row interface{}) (godal.IGeneric
 	return gbo, err
 }
 
-// ColumnsList implements godal.IRowMapper.ColumnsList
+// ColumnsList implements godal.IRowMapper.ColumnsList.
 func (r *rowMapperMongo) ColumnsList(storageId string) []string {
 	return r.wrap.ColumnsList(storageId)
 }
 
 // NewUniversalDaoMongo is helper method to create UniversalDaoMongo instance.
-//
-// - txModeOnWrite: enables/disables transaction mode on write operations.
+//   - txModeOnWrite: enables/disables transaction mode on write operations.
 //       MongoDB's implementation of GdaoCreate is "get/check and write".
 //       It can be done either in transaction (txModeOnWrite=true) or non-transaction (txModeOnWrite=false) mode.
 //       As of MongoDB 4.0, transactions are available for replica set deployments only. Since MongoDB 4.2, transactions are also available for sharded cluster.
