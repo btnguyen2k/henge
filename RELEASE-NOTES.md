@@ -1,5 +1,9 @@
 # henge release notes
 
+## 2021-01-2x - v0.3.2
+
+- `UniversalDaoDynamodb`: add `pkPrefix` and `pkPrefixValue`, supporting multi-tenant DynamoDB tables.
+
 ## 2021-01-20 - v0.3.1
 
 - Function `InitDynamodbTable` is deprecated, use `InitDynamodbTables` instead.

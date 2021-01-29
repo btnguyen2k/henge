@@ -57,11 +57,13 @@ func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu 
 //
 // Available: since v0.3.0
 type HengeDynamodbTablesSpec struct {
-	MainTableRcu    int64 // rcu of the main table
-	MainTableWcu    int64 // wcu of the main table
-	CreateUidxTable bool  // if true, the secondary table is created
-	UidxTableRcu    int64 // rcu of the secondary table
-	UidxTableWcu    int64 // wcu of the secondary table
+	MainTableRcu         int64                         // rcu of the main table
+	MainTableWcu         int64                         // wcu of the main table
+	MainTableCustomAttrs []prom.AwsDynamodbNameAndType // (since v0.3.2) main table's custom attributes (beside henge's attributes)
+	MainTablePkPrefix    string                        // (since v0.3.2) prefix attribute to main table's PK (if defined, PK of the main table is { pkPrefix, FieldId }; otherwise { FieldId } ). MainTablePkPrefix, if specified, must be included in MainTableCustomAttrs.
+	CreateUidxTable      bool                          // if true, the secondary table is created
+	UidxTableRcu         int64                         // rcu of the secondary table
+	UidxTableWcu         int64                         // wcu of the secondary table
 }
 
 // InitDynamodbTables initializes a DynamoDB table(s) to store henge business objects.
@@ -69,19 +71,31 @@ type HengeDynamodbTablesSpec struct {
 //   - The secondary table is used to manage unique indexes. The secondary table has the same base name and suffixed by AwsDynamodbUidxTableSuffix.
 //   - The secondary table has the following schema: { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
 //   - Other than the two tables, no local index or global index is created.
+//   - (since v0.3.2) spec.MainTableCustomAttrs can be used to define main table's custom attributes.
+//   - (since v0.3.2) spec.MainTablePkPrefix can be used to override main table's PK.
+//     - if spec.MainTablePkPrefix is not supplied, main table is created with PK as { FieldId }
+//     - otherwise, main table is created with PK as { spec.MainTablePkPrefix, FieldId }
 //
 // Available: since v0.3.0
 func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *HengeDynamodbTablesSpec) error {
 	if spec == nil {
 		return errors.New("table spec is nil")
 	}
+	// main table
 	attrDefs := []prom.AwsDynamodbNameAndType{{Name: FieldId, Type: prom.AwsAttrTypeString}}
+	if len(spec.MainTableCustomAttrs) > 0 {
+		attrDefs = append(attrDefs, spec.MainTableCustomAttrs...)
+	}
 	pkDefs := []prom.AwsDynamodbNameAndType{{Name: FieldId, Type: prom.AwsKeyTypePartition}}
+	if strings.TrimSpace(spec.MainTablePkPrefix) != "" {
+		pkDefs = []prom.AwsDynamodbNameAndType{{Name: strings.TrimSpace(spec.MainTablePkPrefix), Type: prom.AwsKeyTypePartition}, {Name: FieldId, Type: prom.AwsKeyTypeSort}}
+	}
 	err := adc.CreateTable(nil, tableName, spec.MainTableRcu, spec.MainTableWcu, attrDefs, pkDefs)
 	if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException); err != nil {
 		return err
 	}
 
+	// secondary table
 	if spec.CreateUidxTable {
 		attrDefs = []prom.AwsDynamodbNameAndType{
 			{Name: AwsDynamodbUidxTableColName, Type: prom.AwsAttrTypeString},
@@ -100,9 +114,16 @@ func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *He
 	return nil
 }
 
-func buildRowMapperDynamodb(tableName string) godal.IRowMapper {
+// buildRowMapperDynamodb is helper method to build godal.IRowMapper for UniversalDaoDynamodb.
+//
+// Default partition key is { FieldId }. This can be overridden by pkPrefix. If specified, partition key is { pkPrefix, FieldId }
+func buildRowMapperDynamodb(tableName string, pkPrefix string) godal.IRowMapper {
+	pkAttrs := []string{FieldId}
+	if strings.TrimSpace(pkPrefix) != "" {
+		pkAttrs = []string{strings.TrimSpace(pkPrefix), FieldId}
+	}
 	return &rowMapperDynamodb{wrap: &dynamodb.GenericRowMapperDynamodb{
-		ColumnsListMap: map[string][]string{tableName: {FieldId}},
+		ColumnsListMap: map[string][]string{tableName: pkAttrs},
 	}}
 }
 
@@ -112,8 +133,8 @@ type rowMapperDynamodb struct {
 }
 
 // ToRow implements godal.IRowMapper.ToRow.
-func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
-	row, err := r.wrap.ToRow(storageId, bo)
+func (r *rowMapperDynamodb) ToRow(tableName string, bo godal.IGenericBo) (interface{}, error) {
+	row, err := r.wrap.ToRow(tableName, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
 		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
 		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
@@ -123,8 +144,8 @@ func (r *rowMapperDynamodb) ToRow(storageId string, bo godal.IGenericBo) (interf
 }
 
 // ToBo implements godal.IRowMapper.ToBo.
-func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
-	gbo, err := r.wrap.ToBo(storageId, row)
+func (r *rowMapperDynamodb) ToBo(tableName string, row interface{}) (godal.IGenericBo, error) {
+	gbo, err := r.wrap.ToBo(tableName, row)
 	if err == nil && gbo != nil {
 		if data, err := gbo.GboGetAttr(FieldData, nil); err == nil {
 			// Note: convert 'data' column from row to JSON-encoded string before storing to FieldData
@@ -142,22 +163,26 @@ func (r *rowMapperDynamodb) ToBo(storageId string, row interface{}) (godal.IGene
 }
 
 // ColumnsList implements godal.IRowMapper.ColumnsList.
-func (r *rowMapperDynamodb) ColumnsList(storageId string) []string {
-	return r.wrap.ColumnsList(storageId)
+func (r *rowMapperDynamodb) ColumnsList(tableName string) []string {
+	return r.wrap.ColumnsList(tableName)
 }
 
 // NewUniversalDaoDynamodb is helper method to create UniversalDaoDynamodb instance.
 //   - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
-func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, uidxAttrs [][]string) UniversalDao {
+//   - the table has default pk as { FieldId }. If pkPrefix is supplied, table pk becomes { pkPrefix, FieldId }.
+//   - static value for pkPrefix attribute can be specified via pkPrefixValue.
+func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName, pkPrefix, pkPrefixValue string, uidxAttrs [][]string) UniversalDao {
 	dao := &UniversalDaoDynamodb{
 		tableName:     tableName,
+		pkPrefix:      pkPrefix,
+		pkPrefixValue: pkPrefixValue,
 		uidxTableName: tableName + AwsDynamodbUidxTableSuffix,
 		uidxAttrs:     uidxAttrs,
 		uidxHf1:       checksum.Sha1HashFunc,
 		uidxHf2:       checksum.Md5HashFunc,
 	}
 	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
-	dao.SetRowMapper(buildRowMapperDynamodb(tableName))
+	dao.SetRowMapper(buildRowMapperDynamodb(tableName, pkPrefix))
 	return dao
 }
 
@@ -165,6 +190,8 @@ func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, uid
 type UniversalDaoDynamodb struct {
 	*dynamodb.GenericDaoDynamodb
 	tableName        string            // name of database table to store business objects
+	pkPrefix         string            // (since v0.3.2) if pkPrefix is supplied, table has PK as { pkPrefix, FieldId }; otherwise { FieldId }
+	pkPrefixValue    string            // (since v0.3.2) static value for pkPrefix attribute
 	uidxTableName    string            // name of database table to store unique indexes
 	uidxAttrs        [][]string        // list of unique indexes (each unique index is a combination of table columns)
 	uidxHf1, uidxHf2 checksum.HashFunc // hash functions used to calculate unique index hash
@@ -173,6 +200,24 @@ type UniversalDaoDynamodb struct {
 // GetTableName returns name of database table to store business objects.
 func (dao *UniversalDaoDynamodb) GetTableName() string {
 	return dao.tableName
+}
+
+// GetPkPrefix returns value of dao.pkPrefix.
+//
+// pkPrefix and pkPrefix are used by GdaoCreateFilter.
+//
+// Available: since v0.3.2
+func (dao *UniversalDaoDynamodb) GetPkPrefix() string {
+	return dao.pkPrefix
+}
+
+// GetPkPrefixValue returns static value for dao.pkPrefix attribute.
+//
+// pkPrefix and pkPrefix are used by GdaoCreateFilter.
+//
+// Available: since v0.3.2
+func (dao *UniversalDaoDynamodb) GetPkPrefixValue() string {
+	return dao.pkPrefixValue
 }
 
 // GetUidxTableName returns name of database table to store unique indexes.
@@ -241,8 +286,20 @@ func (dao *UniversalDaoDynamodb) BuildUidxValues(bo godal.IGenericBo) map[string
 }
 
 // GdaoCreateFilter implements IGenericDao.GdaoCreateFilter.
+//
+// If dao.pkPrefix is specified, this function creates filter on compound PK as { dao.pkPrefix, FieldId }. Otherwise, filter on single-attribute PK as { FieldId } is created.
+//
+// If dao.pkPrefix is specified, this function first fetches value of attribute dao.pkPrefix from BO. If the fetched value is empty, dao.pkPrefixValue is used.
 func (dao *UniversalDaoDynamodb) GdaoCreateFilter(_ string, bo godal.IGenericBo) interface{} {
-	return map[string]interface{}{FieldId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+	filter := map[string]interface{}{FieldId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+	if dao.pkPrefix != "" {
+		v := bo.GboGetAttrUnsafe(dao.pkPrefix, reddo.TypeString)
+		if v == nil || v == "" {
+			v = dao.pkPrefixValue
+		}
+		filter[dao.pkPrefix] = v
+	}
+	return filter
 }
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
@@ -297,7 +354,7 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
+		return false, fmt.Errorf("cannot find PK attribute list for table [%s]", dao.tableName)
 	}
 	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
 	if !ok || keyFilter == nil {
@@ -351,7 +408,7 @@ func (dao *UniversalDaoDynamodb) Create(bo *UniversalBo) (bool, error) {
 
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
+		return false, fmt.Errorf("cannot find PK attribute list for table [%s]", dao.tableName)
 	}
 	row, err := dao.GetRowMapper().ToRow(dao.tableName, gbo)
 	if err != nil {
@@ -396,7 +453,8 @@ func (dao *UniversalDaoDynamodb) Create(bo *UniversalBo) (bool, error) {
 
 // Get implements UniversalDao.Get.
 func (dao *UniversalDaoDynamodb) Get(id string) (*UniversalBo, error) {
-	gbo, err := dao.GdaoFetchOne(dao.tableName, map[string]interface{}{FieldId: id})
+	filterBo := NewUniversalBo(id, 0)
+	gbo, err := dao.GdaoFetchOne(dao.tableName, dao.GdaoCreateFilter(dao.tableName, dao.ToGenericBo(filterBo)))
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +492,7 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 	}
 
 	// cancel update if there is no existing row to update
-	oldGbo, err := dao.GdaoFetchOne(dao.tableName, map[string]interface{}{FieldId: bo.id})
+	oldGbo, err := dao.GdaoFetchOne(dao.tableName, dao.GdaoCreateFilter(dao.tableName, dao.ToGenericBo(bo)))
 	if err != nil {
 		return false, err
 	}
@@ -444,7 +502,7 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
+		return false, fmt.Errorf("cannot find PK attribute list for table [%s]", dao.tableName)
 	}
 	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
 	if !ok || keyFilter == nil {
@@ -458,7 +516,7 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 	if !ok || keyFilter == nil {
 		return false, errors.New("row data must be a map")
 	}
-	// remove primary key attributes from update list
+	// remove pk attributes from update list
 	for _, pk := range pkAttrs {
 		delete(rowMap, pk)
 	}
@@ -531,7 +589,7 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 	oldGbo := dao.ToGenericBo(existing)
 	pkAttrs := dao.GetRowMapper().ColumnsList(dao.tableName)
 	if pkAttrs == nil || len(pkAttrs) == 0 {
-		return false, existing, fmt.Errorf("cannot find primary-key attribute list for table [%s]", dao.tableName)
+		return false, existing, fmt.Errorf("cannot find PK attribute list for table [%s]", dao.tableName)
 	}
 	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
 	if !ok || keyFilter == nil {
