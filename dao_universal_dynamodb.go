@@ -53,14 +53,14 @@ func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu 
 	return prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException)
 }
 
-// HengeDynamodbTablesSpec holds specification of DynamoDB tables to be created.
+// DynamodbTablesSpec holds specification of DynamoDB tables to be created.
 //
-// Available: since v0.3.0
-type HengeDynamodbTablesSpec struct {
+// Available: since v0.3.2
+type DynamodbTablesSpec struct {
 	MainTableRcu         int64                         // rcu of the main table
 	MainTableWcu         int64                         // wcu of the main table
-	MainTableCustomAttrs []prom.AwsDynamodbNameAndType // (since v0.3.2) main table's custom attributes (beside henge's attributes)
-	MainTablePkPrefix    string                        // (since v0.3.2) prefix attribute to main table's PK (if defined, PK of the main table is { pkPrefix, FieldId }; otherwise { FieldId } ). MainTablePkPrefix, if specified, must be included in MainTableCustomAttrs.
+	MainTableCustomAttrs []prom.AwsDynamodbNameAndType // main table's custom attributes (beside henge's attributes)
+	MainTablePkPrefix    string                        // prefix attribute to main table's PK (if defined, PK of the main table is { pkPrefix, FieldId }; otherwise { FieldId } ). MainTablePkPrefix, if specified, must be included in MainTableCustomAttrs.
 	CreateUidxTable      bool                          // if true, the secondary table is created
 	UidxTableRcu         int64                         // rcu of the secondary table
 	UidxTableWcu         int64                         // wcu of the secondary table
@@ -77,7 +77,7 @@ type HengeDynamodbTablesSpec struct {
 //     - otherwise, main table is created with PK as { spec.MainTablePkPrefix, FieldId }
 //
 // Available: since v0.3.0
-func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *HengeDynamodbTablesSpec) error {
+func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *DynamodbTablesSpec) error {
 	if spec == nil {
 		return errors.New("table spec is nil")
 	}
@@ -87,8 +87,8 @@ func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *He
 		attrDefs = append(attrDefs, spec.MainTableCustomAttrs...)
 	}
 	pkDefs := []prom.AwsDynamodbNameAndType{{Name: FieldId, Type: prom.AwsKeyTypePartition}}
-	if strings.TrimSpace(spec.MainTablePkPrefix) != "" {
-		pkDefs = []prom.AwsDynamodbNameAndType{{Name: strings.TrimSpace(spec.MainTablePkPrefix), Type: prom.AwsKeyTypePartition}, {Name: FieldId, Type: prom.AwsKeyTypeSort}}
+	if spec.MainTablePkPrefix != "" {
+		pkDefs = []prom.AwsDynamodbNameAndType{{Name: spec.MainTablePkPrefix, Type: prom.AwsKeyTypePartition}, {Name: FieldId, Type: prom.AwsKeyTypeSort}}
 	}
 	err := adc.CreateTable(nil, tableName, spec.MainTableRcu, spec.MainTableWcu, attrDefs, pkDefs)
 	if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException); err != nil {
@@ -119,8 +119,8 @@ func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *He
 // Default partition key is { FieldId }. This can be overridden by pkPrefix. If specified, partition key is { pkPrefix, FieldId }
 func buildRowMapperDynamodb(tableName string, pkPrefix string) godal.IRowMapper {
 	pkAttrs := []string{FieldId}
-	if strings.TrimSpace(pkPrefix) != "" {
-		pkAttrs = []string{strings.TrimSpace(pkPrefix), FieldId}
+	if pkPrefix != "" {
+		pkAttrs = []string{pkPrefix, FieldId}
 	}
 	return &rowMapperDynamodb{wrap: &dynamodb.GenericRowMapperDynamodb{
 		ColumnsListMap: map[string][]string{tableName: pkAttrs},
@@ -167,22 +167,34 @@ func (r *rowMapperDynamodb) ColumnsList(tableName string) []string {
 	return r.wrap.ColumnsList(tableName)
 }
 
+// DynamodbDaoSpec holds specification of UniversalDaoDynamodb to be created.
+//
+// Available: since v0.3.2
+type DynamodbDaoSpec struct {
+	PkPrefix      string     // (multi-tenant) if pkPrefix is supplied, table's PK is { PkPrefix, FieldId }, otherwise table's PK is { FieldId }
+	PkPrefixValue string     // (multi-tenant) static value for PkPrefix attribute
+	UidxAttrs     [][]string // list of unique indexes, each unique index is a combination of table columns
+}
+
 // NewUniversalDaoDynamodb is helper method to create UniversalDaoDynamodb instance.
 //   - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
 //   - the table has default pk as { FieldId }. If pkPrefix is supplied, table pk becomes { pkPrefix, FieldId }.
 //   - static value for pkPrefix attribute can be specified via pkPrefixValue.
-func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName, pkPrefix, pkPrefixValue string, uidxAttrs [][]string) UniversalDao {
+func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, spec *DynamodbDaoSpec) UniversalDao {
+	if spec == nil {
+		spec = &DynamodbDaoSpec{}
+	}
 	dao := &UniversalDaoDynamodb{
 		tableName:     tableName,
-		pkPrefix:      pkPrefix,
-		pkPrefixValue: pkPrefixValue,
+		pkPrefix:      spec.PkPrefix,
+		pkPrefixValue: spec.PkPrefixValue,
 		uidxTableName: tableName + AwsDynamodbUidxTableSuffix,
-		uidxAttrs:     uidxAttrs,
+		uidxAttrs:     spec.UidxAttrs,
 		uidxHf1:       checksum.Sha1HashFunc,
 		uidxHf2:       checksum.Md5HashFunc,
 	}
 	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
-	dao.SetRowMapper(buildRowMapperDynamodb(tableName, pkPrefix))
+	dao.SetRowMapper(buildRowMapperDynamodb(tableName, spec.PkPrefix))
 	return dao
 }
 

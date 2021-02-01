@@ -3,6 +3,10 @@
 ## 2021-01-2x - v0.3.2
 
 - `UniversalDaoDynamodb`: add `pkPrefix` and `pkPrefixValue`, supporting multi-tenant DynamoDB tables.
+- `UniversalDaoCosmosdbSql`: support multi-tenant CosmosDB collections.
+- **Breaking changes**:
+  - New structs `DynamodbTablesSpec` and `DynamodbDaoSpec`, signatures of functions `InitDynamodbTables` and `NewUniversalDaoDynamodb` changed.
+  - New structs `CosmosdbCollectionSpec` and `CosmosdbDaoSpec`, signatures of functions `InitCosmosdbCollection` and `NewUniversalDaoCosmosdbSql` changed.
 
 ## 2021-01-20 - v0.3.1
 

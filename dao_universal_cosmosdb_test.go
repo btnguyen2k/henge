@@ -36,19 +36,15 @@ func _testCosmosdbInitSqlConnect(t *testing.T, testName, tableName string) *prom
 	url = strings.ReplaceAll(url, "${loc}", urlTimezone)
 	url = strings.ReplaceAll(url, "${tz}", urlTimezone)
 	url = strings.ReplaceAll(url, "${timezone}", urlTimezone)
-
 	url += ";Db=henge"
-
 	sqlc, err := NewCosmosdbConnection(url, timezone, driver, 10000, nil)
 	if err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "NewCosmosdbConnection", err)
 	}
+	sqlc.GetDB().Exec("CREATE DATABASE henge WITH maxru=10000")
 	if err := _cleanupCosmosdb(sqlc, tableName); err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "_cleanupCosmosdb", err)
 	}
-
-	sqlc.GetDB().Exec("CREATE DATABASE henge WITH maxru=10000")
-
 	return sqlc
 }
 
@@ -64,48 +60,33 @@ func TestInitCosmosdbTable(t *testing.T) {
 	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
 	for i := 0; i < 2; i++ {
-		if err := InitCosmosdbCollection(sqlc, tblName, "id", 0, 0, nil); err != nil {
+		spec := &CosmosdbCollectionSpec{Pk: "id"}
+		if err := InitCosmosdbCollection(sqlc, tblName, spec); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
 		}
 	}
 }
 
-// func TestCreateIndexPgsql(t *testing.T) {
-// 	name := "TestCreateIndexPgsql"
-// 	tblName := "table_temp"
-// 	sqlc := _testPgsqlInitSqlConnect(t, name, tblName)
-// 	defer sqlc.Close()
-// 	colDef := map[string]string{"col_email": "VARCHAR(64)", "col_age": "INT"}
-// 	if err := InitPgsqlTable(sqlc, tblName, colDef); err != nil {
-// 		t.Fatalf("%s failed: %s", name, err)
-// 	}
-// 	if err := CreateIndexSql(sqlc, tblName, true, []string{"col_email"}); err != nil {
-// 		t.Fatalf("%s failed: %s", name, err)
-// 	}
-// 	if err := CreateIndexSql(sqlc, tblName, false, []string{"col_age"}); err != nil {
-// 		t.Fatalf("%s failed: %s", name, err)
-// 	}
-// }
-
 const (
 	colCosmosdbPk = "type"
 )
 
-func _testCosmosdbInit(t *testing.T, name, tblName string) (*prom.SqlConnect, UniversalDao) {
-	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
-	if err := InitCosmosdbCollection(sqlc, tblName, colCosmosdbPk, 0, 0, [][]string{{"/email"}}); err != nil {
+func _testCosmosdbInit(t *testing.T, name string, sqlc *prom.SqlConnect, tblName, pkName, pkValue string) UniversalDao {
+	collectionSpec := &CosmosdbCollectionSpec{Pk: pkName, Uk: [][]string{{"/email"}}}
+	if err := InitCosmosdbCollection(sqlc, tblName, collectionSpec); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	}
-	dao := NewUniversalDaoCosmosdbSql(sqlc, tblName, colCosmosdbPk, true)
-
-	return sqlc, dao
+	daoSpec := &CosmosdbDaoSpec{PkName: pkName, PkValue: pkValue, TxModeOnWrite: true}
+	dao := NewUniversalDaoCosmosdbSql(sqlc, tblName, daoSpec)
+	return dao
 }
 
 func TestCosmosdb_Create(t *testing.T) {
 	name := "TestCosmosdb_Create"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -123,8 +104,9 @@ func TestCosmosdb_Create(t *testing.T) {
 func TestCosmosdb_CreateExistingPK(t *testing.T) {
 	name := "TestCosmosdb_CreateExistingPK"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -149,8 +131,9 @@ func TestCosmosdb_CreateExistingPK(t *testing.T) {
 func TestCosmosdb_CreateExistingUnique(t *testing.T) {
 	name := "TestCosmosdb_CreateExistingUnique"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -175,8 +158,9 @@ func TestCosmosdb_CreateExistingUnique(t *testing.T) {
 func TestCosmosdb_CreateGet(t *testing.T) {
 	name := "TestCosmosdb_CreateGet"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -216,8 +200,9 @@ func TestCosmosdb_CreateGet(t *testing.T) {
 func TestCosmosdb_CreateDelete(t *testing.T) {
 	name := "TestCosmosdb_CreateDelete"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -253,8 +238,9 @@ func TestCosmosdb_CreateDelete(t *testing.T) {
 func TestCosmosdb_CreateGetMany(t *testing.T) {
 	name := "TestCosmosdb_CreateGetMany"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -286,8 +272,9 @@ func TestCosmosdb_CreateGetMany(t *testing.T) {
 func TestCosmosdb_CreateGetManyWithFilter(t *testing.T) {
 	name := "TestCosmosdb_CreateGetManyWithFilter"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -320,8 +307,9 @@ func TestCosmosdb_CreateGetManyWithFilter(t *testing.T) {
 func TestCosmosdb_CreateGetManyWithSorting(t *testing.T) {
 	name := "TestCosmosdb_CreateGetManyWithSorting"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -358,8 +346,9 @@ func TestCosmosdb_CreateGetManyWithSorting(t *testing.T) {
 func TestCosmosdb_CreateGetManyWithFilterAndSorting(t *testing.T) {
 	name := "TestCosmosdb_CreateGetManyWithFilterAndSorting"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -397,8 +386,9 @@ func TestCosmosdb_CreateGetManyWithFilterAndSorting(t *testing.T) {
 func TestCosmosdb_CreateGetManyWithSortingAndPaging(t *testing.T) {
 	name := "TestCosmosdb_CreateGetManyWithSortingAndPaging"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -439,8 +429,9 @@ func TestCosmosdb_CreateGetManyWithSortingAndPaging(t *testing.T) {
 func TestCosmosdb_Update(t *testing.T) {
 	name := "TestCosmosdb_Update"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -488,8 +479,9 @@ func TestCosmosdb_Update(t *testing.T) {
 func TestCosmosdb_UpdateNotExist(t *testing.T) {
 	name := "TestCosmosdb_UpdateNotExist"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -507,8 +499,9 @@ func TestCosmosdb_UpdateNotExist(t *testing.T) {
 func TestCosmosdb_UpdateDuplicated(t *testing.T) {
 	name := "TestCosmosdb_UpdateDuplicated"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 
 	ubo1 := NewUniversalBo("1", 1357)
 	ubo1.SetExtraAttr(colCosmosdbPk, "users")
@@ -538,8 +531,9 @@ func TestCosmosdb_UpdateDuplicated(t *testing.T) {
 func TestCosmosdb_SaveNew(t *testing.T) {
 	name := "TestCosmosdb_SaveNew"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -581,8 +575,9 @@ func TestCosmosdb_SaveNew(t *testing.T) {
 func TestCosmosdb_SaveExisting(t *testing.T) {
 	name := "TestCosmosdb_SaveExisting"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo := NewUniversalBo("id", 1357)
 	ubo.SetExtraAttr(colCosmosdbPk, "users")
 	ubo.SetDataAttr("name.first", "Thanh")
@@ -648,8 +643,9 @@ func TestCosmosdb_SaveExisting(t *testing.T) {
 func TestCosmosdb_SaveExistingUnique(t *testing.T) {
 	name := "TestCosmosdb_SaveExistingUnique"
 	tblName := "table_temp"
-	sqlc, dao := _testCosmosdbInit(t, name, tblName)
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
 	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
 	ubo1 := NewUniversalBo("1", 1357)
 	ubo1.SetExtraAttr(colCosmosdbPk, "users")
 	ubo1.SetDataAttr("name.first", "Thanh1")
