@@ -22,7 +22,7 @@ var (
 
 func _testDynamodbSingleTableInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName, pkPrefix, pkPrefixValue string, uidxIndexes [][]string) UniversalDao {
 	_cleanupDynamodb(adc, tableName)
-	spec := &HengeDynamodbTablesSpec{
+	spec := &DynamodbTablesSpec{
 		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
 		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
 	}
@@ -33,7 +33,8 @@ func _testDynamodbSingleTableInit(t *testing.T, testName string, adc *prom.AwsDy
 	if err := InitDynamodbTables(adc, tableName, spec); err != nil {
 		t.Fatalf("%s failed: %s", testName, err)
 	}
-	return NewUniversalDaoDynamodb(adc, tableName, pkPrefix, pkPrefixValue, uidxIndexes)
+	daoSpec := &DynamodbDaoSpec{PkPrefix: pkPrefix, PkPrefixValue: pkPrefixValue, UidxAttrs: uidxIndexes}
+	return NewUniversalDaoDynamodb(adc, tableName, daoSpec)
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -385,11 +386,11 @@ func TestDynamodbSingleTable_CreateGetManyWithFilter(t *testing.T) {
 				}
 			}
 
-			filter := expression.Name("age").GreaterThanEqual(expression.Value(35 + 3))
-			if boType == "products" {
+			filter := expression.Name("email").GreaterThanEqual(expression.Value("3@mydomain.com"))
+			if boType == "users" {
+				filter = expression.Name("age").GreaterThanEqual(expression.Value(35 + 3))
+			} else if boType == "products" {
 				filter = expression.Name("stock").GreaterThanEqual(expression.Value(35 + 3))
-			} else {
-				filter = expression.Name("email").GreaterThanEqual(expression.Value("3@mydomain.com"))
 			}
 			if boList, err := dao.GetAll(filter, nil); err != nil {
 				t.Fatalf("%s failed: %s", name, err)
@@ -468,11 +469,11 @@ func TestDynamodbSingleTable_CreateGetManyWithPaging(t *testing.T) {
 			} else {
 				for _, bo := range boList {
 					if boType == "users" && bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt).(int64) < 35+3 {
-						t.Fatalf("%s failed: expected value >= %#v but received %#v", name, 35+3, bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt))
+						t.Fatalf("%s failed: expected value >= %#v but received %#v", name+"/"+boType, 35+3, bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt))
 					} else if boType == "products" && bo.GetExtraAttrAsUnsafe("stock", reddo.TypeInt).(int64) < 35+3 {
-						t.Fatalf("%s failed: expected value >= %#v but received %#v", name, 35+3, bo.GetExtraAttrAsUnsafe("stock", reddo.TypeInt))
+						t.Fatalf("%s failed: expected value >= %#v but received %#v", name+"/"+boType, 35+3, bo.GetExtraAttrAsUnsafe("stock", reddo.TypeInt))
 					} else if bo.GetExtraAttrAsUnsafe("email", reddo.TypeString).(string) < "3@mydomain.com" {
-						t.Fatalf("%s failed: expected value >= %#v but received %#v", name, "3@mydomain.com", bo.GetExtraAttrAsUnsafe("email", reddo.TypeString))
+						t.Fatalf("%s failed: expected value >= %#v but received %#v", name+"/"+boType, "3@mydomain.com", bo.GetExtraAttrAsUnsafe("email", reddo.TypeString))
 					}
 				}
 			}

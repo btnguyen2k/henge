@@ -101,7 +101,7 @@ func TestInitDynamodbTable(t *testing.T) {
 	if ok, err := adc.HasTable(nil, tableName+AwsDynamodbUidxTableSuffix); err != nil || ok {
 		t.Fatalf("%s failed: error [%s] or table [%s] exist", name, err, tableName+AwsDynamodbUidxTableSuffix)
 	}
-	if err := InitDynamodbTables(adc, tableName, &HengeDynamodbTablesSpec{
+	if err := InitDynamodbTables(adc, tableName, &DynamodbTablesSpec{
 		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
 		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
 	}); err != nil {
@@ -118,13 +118,14 @@ func TestInitDynamodbTable(t *testing.T) {
 
 func _testDynamodbInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName string, uidxIndexes [][]string) UniversalDao {
 	_cleanupDynamodb(adc, tableName)
-	if err := InitDynamodbTables(adc, tableName, &HengeDynamodbTablesSpec{
+	if err := InitDynamodbTables(adc, tableName, &DynamodbTablesSpec{
 		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
 		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
 	}); err != nil {
 		t.Fatalf("%s failed: %s", testName, err)
 	}
-	return NewUniversalDaoDynamodb(adc, tableName, "", "", uidxIndexes)
+	daoSpec := &DynamodbDaoSpec{UidxAttrs: uidxIndexes}
+	return NewUniversalDaoDynamodb(adc, tableName, daoSpec)
 }
 
 func TestNewUniversalDaoDynamodb(t *testing.T) {
@@ -133,7 +134,7 @@ func TestNewUniversalDaoDynamodb(t *testing.T) {
 	defer adc.Close()
 
 	tableName := "tbl_test"
-	dao := NewUniversalDaoDynamodb(adc, tableName, "", "", nil).(*UniversalDaoDynamodb)
+	dao := NewUniversalDaoDynamodb(adc, tableName, nil).(*UniversalDaoDynamodb)
 	if dao.GetTableName() != tableName {
 		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableName, dao.GetTableName())
 	}
@@ -145,7 +146,7 @@ func TestNewUniversalDaoDynamodb(t *testing.T) {
 	}
 
 	uidxAttrs := [][]string{{"email"}, {"subject", "level"}}
-	dao = NewUniversalDaoDynamodb(adc, tableName, "", "", uidxAttrs).(*UniversalDaoDynamodb)
+	dao = NewUniversalDaoDynamodb(adc, tableName, &DynamodbDaoSpec{UidxAttrs: uidxAttrs}).(*UniversalDaoDynamodb)
 	if dao.GetTableName() != tableName {
 		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableName, dao.GetTableName())
 	}
@@ -167,7 +168,7 @@ func TestUniversalDaoDynamodb_SetGetUidxHashFunctions(t *testing.T) {
 	defer adc.Close()
 
 	tableName := "tbl_test"
-	dao := NewUniversalDaoDynamodb(adc, tableName, "", "", nil).(*UniversalDaoDynamodb)
+	dao := NewUniversalDaoDynamodb(adc, tableName, nil).(*UniversalDaoDynamodb)
 	if hfList := dao.GetUidxHashFunctions(); len(hfList) != 2 || hfList[0] == nil || hfList[1] == nil {
 		t.Fatalf("%s failed", name)
 	}
