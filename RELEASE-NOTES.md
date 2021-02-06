@@ -1,6 +1,6 @@
 # henge release notes
 
-## 2021-02-xx - v0.3.2
+## 2021-02-06 - v0.3.2
 
 - `UniversalDaoDynamodb`: add `pkPrefix` and `pkPrefixValue`, supporting multi-tenant DynamoDB tables.
 - `UniversalDaoCosmosdbSql`: support multi-tenant CosmosDB collections.
