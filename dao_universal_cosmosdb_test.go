@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +16,85 @@ import (
 	"github.com/btnguyen2k/godal/sql"
 	"github.com/btnguyen2k/prom"
 )
+
+func TestRowMapperCosmosdb_ToRow(t *testing.T) {
+	name := "TestRowMapperCosmosdb_ToRow"
+	rm := buildRowMapperCosmosdb()
+	gbo := godal.NewGenericBo()
+	gbo.GboSetAttr(FieldTagVersion, 123)
+	now := time.Now().Round(time.Millisecond)
+	gbo.GboSetAttr(FieldTimeCreated, now)
+	gbo.GboSetAttr(FieldTimeUpdated, now)
+	gbo.GboSetAttr(FieldData, `{"field":"value"}`)
+	row, err := rm.ToRow("tbl_test", gbo)
+	if err != nil || row == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, row)
+	}
+	// row should be map[string]interface{}
+	rowMap, ok := row.(map[string]interface{})
+	if !ok || rowMap == nil {
+		t.Fatalf("%s failed: expect row to be map[string]interface{} but received %#v", name, rowMap)
+	}
+	if v, err := reddo.ToInt(rowMap[FieldTagVersion]); err != nil || v != 123 {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldTagVersion, 123, v, err)
+	}
+	if v, err := reddo.ToTimeWithLayout(rowMap[FieldTimeCreated], time.RFC3339Nano); err != nil || !v.Equal(now) {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldTimeCreated, now, v, err)
+	}
+	if v, err := reddo.ToTimeWithLayout(rowMap[FieldTimeUpdated], time.RFC3339Nano); err != nil || !v.Equal(now) {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldTimeUpdated, now, v, err)
+	}
+	dataMap := map[string]interface{}{"field": "value"}
+	if v, err := reddo.ToMap(rowMap[FieldData], reflect.TypeOf(dataMap)); err != nil || !reflect.DeepEqual(v, dataMap) {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldData, dataMap, v, err)
+	}
+}
+
+func TestRowMapperCosmosdb_ToBo(t *testing.T) {
+	name := "TestRowMapperCosmosdb_ToBo"
+	rm := buildRowMapperCosmosdb()
+	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: `{"field":"value"}`}); err != nil || bo == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, bo)
+	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
+		t.Fatalf("%s failed: %s / %#v", name, err, data)
+	}
+	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: []byte(`{"field":"value"}`)}); err != nil || bo == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, bo)
+	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
+		t.Fatalf("%s failed: %s / %#v", name, err, data)
+	}
+	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: map[string]string{"field": "value"}}); err != nil || bo == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, bo)
+	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
+		t.Fatalf("%s failed: %s / %#v", name, err, data)
+	}
+}
+
+func Test_CosmosdbFilterGeneratorSql(t *testing.T) {
+	name := "Test_CosmosdbFilterGeneratorSql"
+
+	input := NewUniversalBo("myid", 1234)
+	expected := map[string]interface{}{CosmosdbColId: "myid"}
+	if filter := cosmosdbFilterGeneratorSql("", input); !reflect.DeepEqual(filter, expected) {
+		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
+	}
+	if filter := cosmosdbFilterGeneratorSql("", *input); !reflect.DeepEqual(filter, expected) {
+		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
+	}
+
+	input2 := godal.NewGenericBo()
+	input2.GboSetAttr(FieldId, "myid2")
+	expected = map[string]interface{}{CosmosdbColId: "myid2"}
+	if filter := cosmosdbFilterGeneratorSql("", input2); !reflect.DeepEqual(filter, expected) {
+		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
+	}
+
+	input3 := map[string]interface{}{"filter": "value"}
+	expected = map[string]interface{}{"filter": "value"}
+	if filter := cosmosdbFilterGeneratorSql("", input3); !reflect.DeepEqual(filter, expected) {
+		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
+	}
+}
 
 func _cleanupCosmosdb(sqlc *prom.SqlConnect, tableName string) error {
 	_, err := sqlc.GetDB().Exec(fmt.Sprintf("DROP COLLECTION IF EXISTS %s", tableName))
@@ -48,6 +128,28 @@ func _testCosmosdbInitSqlConnect(t *testing.T, testName, tableName string) *prom
 	return sqlc
 }
 
+func TestInitCosmosdbCollection(t *testing.T) {
+	name := "TestInitCosmosdbCollection"
+	tblName := "table_temp"
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
+	defer sqlc.Close()
+
+	_cleanupCosmosdb(sqlc, tblName)
+	if err := InitCosmosdbCollection(sqlc, tblName, &CosmosdbCollectionSpec{Pk: "pk", Ru: 400}); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	}
+
+	_cleanupCosmosdb(sqlc, tblName)
+	if err := InitCosmosdbCollection(sqlc, tblName, &CosmosdbCollectionSpec{LargePk: "largepk", MaxRu: 4000}); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	}
+
+	_cleanupCosmosdb(sqlc, tblName)
+	if err := InitCosmosdbCollection(sqlc, tblName, &CosmosdbCollectionSpec{Pk: "pk", Uk: [][]string{{"/uk1"}, {"/uk2a", "/uk2b"}}}); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	}
+}
+
 func TestNewCosmosdbConnection(t *testing.T) {
 	name := "TestNewCosmosdbConnection"
 	sqlc := _testCosmosdbInitSqlConnect(t, name, "table_temp")
@@ -79,6 +181,29 @@ func _testCosmosdbInit(t *testing.T, name string, sqlc *prom.SqlConnect, tblName
 	daoSpec := &CosmosdbDaoSpec{PkName: pkName, PkValue: pkValue, TxModeOnWrite: true}
 	dao := NewUniversalDaoCosmosdbSql(sqlc, tblName, daoSpec)
 	return dao
+}
+
+func TestNewUniversalDaoCosmosdbSql(t *testing.T) {
+	name := "TestNewUniversalDaoCosmosdbSql"
+	tblName := "table_temp"
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
+	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
+	if cdao, _ := dao.(*UniversalDaoCosmosdbSql); cdao == nil {
+		t.Fatalf("%s failed: not *UniversalDaoCosmosdbSql", name)
+	} else if v := cdao.GetPkName(); v != colCosmosdbPk {
+		t.Fatalf("%s failed: expected %#v but received %#v", name, colCosmosdbPk, v)
+	} else if v := cdao.GetPkValue(); v != "users" {
+		t.Fatalf("%s failed: expected %#v but received %#v", name, "users", v)
+	}
+}
+
+func TestNewUniversalDaoCosmosdbSql_nil(t *testing.T) {
+	name := "TestNewUniversalDaoCosmosdbSql_nil"
+	dao := NewUniversalDaoCosmosdbSql(nil, "", nil)
+	if dao != nil {
+		t.Fatalf("%s failed: expected nil", name)
+	}
 }
 
 func TestCosmosdb_Create(t *testing.T) {

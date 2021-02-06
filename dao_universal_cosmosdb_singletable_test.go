@@ -250,6 +250,13 @@ func TestCosmosdbSingleTable_CreateDelete(t *testing.T) {
 			t.Fatalf("%s failed: record should not be deleted twice", name)
 		}
 	}
+	if dbRows, err := sqlc.GetDB().Query(fmt.Sprintf("SELECT COUNT(1) FROM %s c WITH cross_partition=true", tblName)); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if rows, err := sqlc.FetchRows(dbRows); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if value := rows[0]["$1"]; int(value.(float64)) != 0 {
+		t.Fatalf("%s failed: expected collection to have %#v rows but received %#v", name, 0, value)
+	}
 }
 
 func TestCosmosdbSingleTable_CreateGetMany(t *testing.T) {

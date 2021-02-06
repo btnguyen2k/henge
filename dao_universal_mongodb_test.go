@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,6 +15,67 @@ import (
 	"github.com/btnguyen2k/prom"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+func TestRowMapperMongo_ToRow(t *testing.T) {
+	name := "TestRowMapperMongo_ToRow"
+	rm := buildRowMapperMongo()
+	gbo := godal.NewGenericBo()
+	gbo.GboSetAttr(FieldTagVersion, 123)
+	now := time.Now().Round(time.Millisecond)
+	gbo.GboSetAttr(FieldTimeCreated, now)
+	gbo.GboSetAttr(FieldTimeUpdated, now)
+	gbo.GboSetAttr(FieldData, `{"field":"value"}`)
+	row, err := rm.ToRow("tbl_test", gbo)
+	if err != nil || row == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, row)
+	}
+	// row should be map[string]interface{}
+	rowMap, ok := row.(map[string]interface{})
+	if !ok || rowMap == nil {
+		t.Fatalf("%s failed: expect row to be map[string]interface{} but received %#v", name, rowMap)
+	}
+	if v, err := reddo.ToInt(rowMap[FieldTagVersion]); err != nil || v != 123 {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldTagVersion, 123, v, err)
+	}
+	if v, err := reddo.ToTimeWithLayout(rowMap[FieldTimeCreated], time.RFC3339Nano); err != nil || !v.Equal(now) {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldTimeCreated, now, v, err)
+	}
+	if v, err := reddo.ToTimeWithLayout(rowMap[FieldTimeUpdated], time.RFC3339Nano); err != nil || !v.Equal(now) {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldTimeUpdated, now, v, err)
+	}
+	dataMap := map[string]interface{}{"field": "value"}
+	if v, err := reddo.ToMap(rowMap[FieldData], reflect.TypeOf(dataMap)); err != nil || !reflect.DeepEqual(v, dataMap) {
+		t.Fatalf("%s failed: expect row[%s] to be %#v but received %#v/%s", name, FieldData, dataMap, v, err)
+	}
+}
+
+func TestRowMapperMongo_ToBo(t *testing.T) {
+	name := "TestRowMapperMongo_ToBo"
+	rm := buildRowMapperMongo()
+	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: `{"field":"value"}`}); err != nil || bo == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, bo)
+	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
+		t.Fatalf("%s failed: %s / %#v", name, err, data)
+	}
+	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: []byte(`{"field":"value"}`)}); err != nil || bo == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, bo)
+	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
+		t.Fatalf("%s failed: %s / %#v", name, err, data)
+	}
+	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: map[string]string{"field": "value"}}); err != nil || bo == nil {
+		t.Fatalf("%s failed: %s / %#v", name, err, bo)
+	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
+		t.Fatalf("%s failed: %s / %#v", name, err, data)
+	}
+}
+
+func TestRowMapperMongo_ColumnsList(t *testing.T) {
+	name := "TestRowMapperMongo_ColumnsList"
+	rm := buildRowMapperMongo()
+	if colList := rm.ColumnsList("*"); len(colList) == 0 {
+		t.Fatalf("%s failed: 0", name)
+	}
+}
 
 func _cleanupMongo(mc *prom.MongoConnect, collectionName string) error {
 	return mc.GetCollection(collectionName).Drop(nil)

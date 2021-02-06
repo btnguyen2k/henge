@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -26,32 +27,6 @@ const (
 	// AwsDynamodbUidxTableColHash holds name of the secondary table's column to store unique index hash value.
 	AwsDynamodbUidxTableColHash = "uhash"
 )
-
-// InitDynamodbTable initializes a DynamoDB table to store henge business objects.
-//   - This function will create 2 tables. Main table with name <tableName> to store business objects. The secondary table
-//     has the same base name and suffixed by AwsDynamodbUidxTableSuffix. The secondary table is used to manage unique indexes.
-//   - The secondary table will be created with the same RCU/WCU and has the following schema:
-//     { AwsDynamodbUidxTableColName, AwsDynamodbUidxTableColHash }
-//   - Other than the two tables, no local index or global index is created.
-//
-// Deprecated: since v0.3.0, use InitDynamodbTables instead.
-func InitDynamodbTable(adc *prom.AwsDynamodbConnect, tableName string, rcu, wcu int64) error {
-	attrDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsAttrTypeString}}
-	pkDefs := []prom.AwsDynamodbNameAndType{{FieldId, prom.AwsKeyTypePartition}}
-	err := adc.CreateTable(nil, tableName, rcu, wcu, attrDefs, pkDefs)
-	if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException); err != nil {
-		return err
-	}
-
-	attrDefs = []prom.AwsDynamodbNameAndType{
-		{AwsDynamodbUidxTableColName, prom.AwsAttrTypeString}, {AwsDynamodbUidxTableColHash, prom.AwsAttrTypeString},
-	}
-	pkDefs = []prom.AwsDynamodbNameAndType{
-		{AwsDynamodbUidxTableColName, prom.AwsKeyTypePartition}, {AwsDynamodbUidxTableColHash, prom.AwsKeyTypeSort},
-	}
-	err = adc.CreateTable(nil, tableName+AwsDynamodbUidxTableSuffix, rcu, wcu, attrDefs, pkDefs)
-	return prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException)
-}
 
 // DynamodbTablesSpec holds specification of DynamoDB tables to be created.
 //
@@ -92,7 +67,9 @@ func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *Dy
 	}
 	err := adc.CreateTable(nil, tableName, spec.MainTableRcu, spec.MainTableWcu, attrDefs, pkDefs)
 	if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException); err != nil {
-		return err
+		if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeResourceInUseException); err != nil {
+			return err
+		}
 	}
 
 	// secondary table
@@ -107,7 +84,9 @@ func InitDynamodbTables(adc *prom.AwsDynamodbConnect, tableName string, spec *Dy
 		}
 		err = adc.CreateTable(nil, tableName+AwsDynamodbUidxTableSuffix, spec.UidxTableRcu, spec.UidxTableWcu, attrDefs, pkDefs)
 		if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeTableAlreadyExistsException); err != nil {
-			return err
+			if err = prom.AwsIgnoreErrorIfMatched(err, awsdynamodb.ErrCodeResourceInUseException); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -136,6 +115,7 @@ type rowMapperDynamodb struct {
 func (r *rowMapperDynamodb) ToRow(tableName string, bo godal.IGenericBo) (interface{}, error) {
 	row, err := r.wrap.ToRow(tableName, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
+		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
 		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
 		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
 		m[FieldData], _ = bo.GboGetAttrUnmarshalJson(FieldData) // Note: FieldData must be JSON-encoded string!
@@ -473,10 +453,80 @@ func (dao *UniversalDaoDynamodb) Get(id string) (*UniversalBo, error) {
 	return dao.ToUniversalBo(gbo), nil
 }
 
+// toConditionBuilder builds a ConditionBuilder from input.
+//
+//   - if input is expression.ConditionBuilder or *expression.ConditionBuilder: return it as *expression.ConditionBuilder.
+// 	 - if input is string, slice/array of bytes: assume input is a map in JSON, convert it to map to build ConditionBuilder.
+// 	 - if input is a map: build an "and" condition connecting sub-conditions where each sub-condition is an "equal" condition built from map entry.
+func toConditionBuilder(input interface{}) (*expression.ConditionBuilder, error) {
+	if input == nil {
+		return nil, nil
+	}
+	switch input.(type) {
+	case expression.ConditionBuilder:
+		result := input.(expression.ConditionBuilder)
+		return &result, nil
+	case *expression.ConditionBuilder:
+		return input.(*expression.ConditionBuilder), nil
+	}
+	v := reflect.ValueOf(input)
+	for ; v.Kind() == reflect.Ptr; v = v.Elem() {
+	}
+	switch v.Kind() {
+	case reflect.String:
+		// expect input to be a map in JSON
+		result := make(map[string]interface{})
+		if err := json.Unmarshal([]byte(v.Interface().(string)), &result); err != nil {
+			return nil, err
+		}
+		return toConditionBuilder(result)
+	case reflect.Array, reflect.Slice:
+		// expect input to be a map in JSON
+		t, err := reddo.ToSlice(v.Interface(), reflect.TypeOf(byte(0)))
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[string]interface{})
+		if err := json.Unmarshal(t.([]byte), &result); err != nil {
+			return nil, err
+		}
+		return toConditionBuilder(result)
+	case reflect.Map:
+		m, err := reddo.ToMap(v.Interface(), reflect.TypeOf(make(map[string]interface{})))
+		if err != nil {
+			return nil, err
+		}
+		var result *expression.ConditionBuilder = nil
+		for k, v := range m.(map[string]interface{}) {
+			if result == nil {
+				t := expression.Name(k).Equal(expression.Value(v))
+				result = &t
+			} else {
+				t := result.And(expression.Name(k).Equal(expression.Value(v)))
+				result = &t
+			}
+		}
+		return result, err
+	}
+	return nil, fmt.Errorf("cannot convert %v to *expression.ConditionBuilder", input)
+}
+
 // GetN implements UniversalDao.GetN.
 func (dao *UniversalDaoDynamodb) GetN(fromOffset, maxNumRows int, filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
 	// TODO AWS DynamoDB does not currently support custom sorting
 
+	if dao.pkPrefix != "" && dao.pkPrefixValue != "" {
+		/* multi-tenant: add tenant filtering */
+		convertFilter, err := toConditionBuilder(filter)
+		if err != nil {
+			return nil, err
+		}
+		t := expression.Name(dao.pkPrefix).Equal(expression.Value(dao.pkPrefixValue))
+		if convertFilter != nil {
+			t = t.And(*convertFilter)
+		}
+		filter = &t
+	}
 	gboList, err := dao.GdaoFetchMany(dao.tableName, filter, sorting, fromOffset, maxNumRows)
 	if err != nil {
 		return nil, err

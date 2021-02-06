@@ -21,7 +21,6 @@ var (
 )
 
 func _testDynamodbSingleTableInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName, pkPrefix, pkPrefixValue string, uidxIndexes [][]string) UniversalDao {
-	_cleanupDynamodb(adc, tableName)
 	spec := &DynamodbTablesSpec{
 		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
 		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
@@ -42,6 +41,8 @@ func TestDynamodbSingleTable_Create(t *testing.T) {
 	name := "TestDynamodbSingleTable_Create"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -69,6 +70,16 @@ func TestDynamodbSingleTable_Create(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
 }
 
 // duplicated PK {dynamodbSingleTablePkPrefix, FieldId} should not be allowed.
@@ -76,6 +87,8 @@ func TestDynamodbSingleTable_CreateExistingPK(t *testing.T) {
 	name := "TestDynamodbSingleTable_CreateExistingPK"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -112,6 +125,16 @@ func TestDynamodbSingleTable_CreateExistingPK(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
 }
 
 // duplicated unique key {dynamodbSingleTablePkPrefix, "email"} or {dynamodbSingleTablePkPrefix, "subject", "level"} should not be allowed.
@@ -119,6 +142,8 @@ func TestDynamodbSingleTable_CreateExistingUnique(t *testing.T) {
 	name := "TestDynamodbSingleTable_CreateExistingUnique"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -173,6 +198,16 @@ func TestDynamodbSingleTable_CreateExistingUnique(t *testing.T) {
 			t.Fatalf("%s failed: record should not be created twice", name)
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*3 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*3, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -180,6 +215,8 @@ func TestDynamodbSingleTable_CreateGet(t *testing.T) {
 	name := "TestDynamodbSingleTable_CreateGet"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -247,6 +284,16 @@ func TestDynamodbSingleTable_CreateGet(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -254,6 +301,8 @@ func TestDynamodbSingleTable_CreateDelete(t *testing.T) {
 	name := "TestDynamodbSingleTable_CreateDelete"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -299,6 +348,16 @@ func TestDynamodbSingleTable_CreateDelete(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != 0 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, 0, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != 0 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, 0, len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -306,6 +365,8 @@ func TestDynamodbSingleTable_CreateGetMany(t *testing.T) {
 	name := "TestDynamodbSingleTable_CreateGetMany"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -342,9 +403,19 @@ func TestDynamodbSingleTable_CreateGetMany(t *testing.T) {
 			if boList, err := dao.GetAll(nil, nil); err != nil {
 				t.Fatalf("%s failed: %s", name, err)
 			} else if len(boList) != 10 {
-				t.Fatalf("%s failed: expected %#v items but received %#v", name, 10, len(boList))
+				t.Fatalf("%s failed: expected %#v items but received %#v", name+"/"+boType, 10, len(boList))
 			}
 		}
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
 	}
 }
 
@@ -353,6 +424,8 @@ func TestDynamodbSingleTable_CreateGetManyWithFilter(t *testing.T) {
 	name := "TestDynamodbSingleTable_CreateGetManyWithFilter"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -399,6 +472,16 @@ func TestDynamodbSingleTable_CreateGetManyWithFilter(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+	}
 }
 
 // AWS Dynamodb does not support custom sorting yet
@@ -421,6 +504,8 @@ func TestDynamodbSingleTable_CreateGetManyWithPaging(t *testing.T) {
 	name := "TestDynamodbSingleTable_CreateGetManyWithPaging"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -456,11 +541,11 @@ func TestDynamodbSingleTable_CreateGetManyWithPaging(t *testing.T) {
 
 			fromOffset := 3
 			numRows := 4
-			filter := expression.Name("age").GreaterThanEqual(expression.Value(35 + 3))
-			if boType == "products" {
+			filter := expression.Name("email").GreaterThanEqual(expression.Value("3@mydomain.com"))
+			if boType == "users" {
+				filter = expression.Name("age").GreaterThanEqual(expression.Value(35 + 3))
+			} else if boType == "products" {
 				filter = expression.Name("stock").GreaterThanEqual(expression.Value(35 + 3))
-			} else {
-				filter = expression.Name("email").GreaterThanEqual(expression.Value("3@mydomain.com"))
 			}
 			if boList, err := dao.GetN(fromOffset, numRows, filter, nil); err != nil {
 				t.Fatalf("%s failed: %s", name, err)
@@ -479,6 +564,16 @@ func TestDynamodbSingleTable_CreateGetManyWithPaging(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -486,6 +581,8 @@ func TestDynamodbSingleTable_Update(t *testing.T) {
 	name := "TestDynamodbSingleTable_Update"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -571,6 +668,16 @@ func TestDynamodbSingleTable_Update(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -578,6 +685,8 @@ func TestDynamodbSingleTable_UpdateNotExist(t *testing.T) {
 	name := "TestDynamodbSingleTable_UpdateNotExist"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -605,6 +714,16 @@ func TestDynamodbSingleTable_UpdateNotExist(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != 0 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, 0, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != 0 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, 0, len(items))
+	}
 }
 
 // duplicated unique key {dynamodbSingleTablePkPrefix, "email"} or {dynamodbSingleTablePkPrefix, "subject", "level"} should not be allowed.
@@ -612,6 +731,8 @@ func TestDynamodbSingleTable_UpdateDuplicated(t *testing.T) {
 	name := "TestDynamodbSingleTable_UpdateDuplicated"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -661,6 +782,16 @@ func TestDynamodbSingleTable_UpdateDuplicated(t *testing.T) {
 			t.Fatalf("%s failed: %s", name, err)
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*2 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*2, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*2 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*2, len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -668,6 +799,8 @@ func TestDynamodbSingleTable_SaveNew(t *testing.T) {
 	name := "TestDynamodbSingleTable_SaveNew"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -737,6 +870,16 @@ func TestDynamodbSingleTable_SaveNew(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -744,6 +887,8 @@ func TestDynamodbSingleTable_SaveExisting(t *testing.T) {
 	name := "TestDynamodbSingleTable_SaveExisting"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -863,6 +1008,16 @@ func TestDynamodbSingleTable_SaveExisting(t *testing.T) {
 			}
 		}
 	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes) {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+	}
 }
 
 // duplicated unique key {dynamodbSingleTablePkPrefix, "email"} or {dynamodbSingleTablePkPrefix, "subject", "level"} should not be allowed.
@@ -870,6 +1025,8 @@ func TestDynamodbSingleTable_SaveExistingUnique(t *testing.T) {
 	name := "TestDynamodbSingleTable_SaveExistingUnique"
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
 	for _, boType := range dynamodbSingleTableBoTypes {
 		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
 		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
@@ -926,5 +1083,15 @@ func TestDynamodbSingleTable_SaveExistingUnique(t *testing.T) {
 			// duplicated {subject:level}
 			t.Fatalf("%s failed: %s", name, err)
 		}
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*2 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*2, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*2 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*2, len(items))
 	}
 }

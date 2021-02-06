@@ -173,7 +173,8 @@ func cosmosdbFilterGeneratorSql(_ string, input interface{}) interface{} {
 		bo := input.(*UniversalBo)
 		return map[string]interface{}{CosmosdbColId: bo.id}
 	}
-	if gbo, ok := input.(godal.IGenericBo); ok {
+	var gbo godal.IGenericBo
+	if gbo, _ = input.(godal.IGenericBo); gbo != nil {
 		return map[string]interface{}{CosmosdbColId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
 	}
 	return input
@@ -216,6 +217,7 @@ func (dao *UniversalDaoCosmosdbSql) GetN(fromOffset, maxNumRows int, filter inte
 		sorting = dao.defaultSorting
 	}
 	if dao.pkName != "" && dao.pkValue != "" {
+		/* multi-tenant: add tenant filtering */
 		convertFilter, err := dao.BuildFilter(filter)
 		if err != nil {
 			return nil, err
