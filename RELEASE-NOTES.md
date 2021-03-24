@@ -1,5 +1,10 @@
 # henge release notes
 
+## 2021-03-24 - v0.4.0
+
+- Bump `btnguyen2k/godal` to `v0.4.0`.
+
+
 ## 2021-02-06 - v0.3.2
 
 - `UniversalDaoDynamodb`: add `pkPrefix` and `pkPrefixValue`, supporting multi-tenant DynamoDB tables.
