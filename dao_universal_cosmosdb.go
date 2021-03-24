@@ -226,7 +226,7 @@ func (dao *UniversalDaoCosmosdbSql) GetN(fromOffset, maxNumRows int, filter inte
 		if dao.GetOptionOpLiteral() != nil {
 			opt = dao.GetOptionOpLiteral().OpEqual
 		}
-		filter = &sql.FilterFieldValue{Field: dao.pkName, Operation: opt, Value: dao.pkValue}
+		filter = &sql.FilterFieldValue{Field: dao.pkName, Operator: opt, Value: dao.pkValue}
 		if convertFilter != nil {
 			filter = (&sql.FilterAnd{}).Add(filter.(sql.IFilter)).Add(convertFilter)
 		}

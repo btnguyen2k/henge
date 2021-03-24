@@ -312,7 +312,7 @@ func TestSqlite_CreateGetManyWithFilter(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_age", Operation: ">=", Value: 35 + 3}
+	filter := &sql.FilterFieldValue{Field: "col_age", Operator: ">=", Value: 35 + 3}
 	if boList, err := dao.GetAll(filter, nil); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 7 {
@@ -382,7 +382,7 @@ func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_email", Operation: "<", Value: "3@mydomain.com"}
+	filter := &sql.FilterFieldValue{Field: "col_email", Operator: "<", Value: "3@mydomain.com"}
 	sorting := map[string]string{"col_email": "desc"}
 	if boList, err := dao.GetAll(filter, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)

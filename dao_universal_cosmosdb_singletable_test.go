@@ -339,11 +339,11 @@ func TestCosmosdbSingleTable_CreateGetManyWithFilter(t *testing.T) {
 			}
 		}
 
-		filter := &sql.FilterFieldValue{Field: "email", Operation: ">=", Value: "3@mydomain.com"}
+		filter := &sql.FilterFieldValue{Field: "email", Operator: ">=", Value: "3@mydomain.com"}
 		if boType == "users" {
-			filter = &sql.FilterFieldValue{Field: "age", Operation: ">=", Value: 35 + 3}
+			filter = &sql.FilterFieldValue{Field: "age", Operator: ">=", Value: 35 + 3}
 		} else if boType == "products" {
-			filter = &sql.FilterFieldValue{Field: "stock", Operation: ">=", Value: 35 + 3}
+			filter = &sql.FilterFieldValue{Field: "stock", Operator: ">=", Value: 35 + 3}
 		}
 		if boList, err := dao.GetAll(filter, nil); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
@@ -446,7 +446,7 @@ func TestCosmosdbSingleTable_CreateGetManyWithFilterAndSorting(t *testing.T) {
 			}
 		}
 
-		filter := &sql.FilterFieldValue{Field: "email", Operation: "<", Value: "3@mydomain.com"}
+		filter := &sql.FilterFieldValue{Field: "email", Operator: "<", Value: "3@mydomain.com"}
 		sorting := map[string]string{"email": "desc"}
 		if boList, err := dao.GetAll(filter, sorting); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
