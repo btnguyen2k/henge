@@ -487,9 +487,10 @@ func (ubo *UniversalBo) Sync() *UniversalBo {
 
 // Clone creates a cloned copy of the business object.
 func (ubo *UniversalBo) Clone() *UniversalBo {
-	ubo.Sync()
+	// ubo.Sync()
 	ubo._lock.RLock()
 	defer ubo._lock.RUnlock()
+	ubo._sync()
 	return &UniversalBo{
 		id:          ubo.id,
 		dataJson:    ubo.dataJson,

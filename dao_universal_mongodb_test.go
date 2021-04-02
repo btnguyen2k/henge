@@ -697,3 +697,54 @@ func TestMongo_SaveExistingUnique(t *testing.T) {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }
+
+func TestMongo_CreateUpdateGet_Checksum(t *testing.T) {
+	name := "TestMongo_CreateUpdateGet_Checksum"
+	collectionName := "table_temp"
+	mc, dao := _testMongoInit(t, name, collectionName)
+	defer mc.Close(nil)
+
+	_tagVersion := uint64(1337)
+	_id := "admin@local"
+	_maskId := "admin"
+	_pwd := "mypassword"
+	_displayName := "Administrator"
+	_isAdmin := true
+	user := newUser(_tagVersion, _id, _maskId)
+	user.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
+	if ok, err := dao.Create(&(user.UniversalBo)); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Create", err)
+	} else if !ok {
+		t.Fatalf("%s failed: cannot create record", name)
+	}
+	if bo, err := dao.Get(_id); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Get", err)
+	} else if bo == nil {
+		t.Fatalf("%s failed: not found", name)
+	} else {
+		if bo.GetChecksum() != user.GetChecksum() {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, user.GetChecksum(), bo.GetChecksum())
+		}
+	}
+
+	oldChecksum := user.GetChecksum()
+	user.SetPassword(_pwd + "-new").SetDisplayName(_displayName + "-new").SetAdmin(!_isAdmin)
+	user.SetDataAttr("name.first", "Thanh2")
+	user.SetDataAttr("name.last", "Nguyen2")
+	user.SetExtraAttr("email", "myname2@mydomain.com")
+	user.SetExtraAttr("age", 37)
+	if ok, err := dao.Update(&(user.UniversalBo)); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Update", err)
+	} else if !ok {
+		t.Fatalf("%s failed: cannot update record", name)
+	}
+	if bo, err := dao.Get(_id); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Get", err)
+	} else if bo == nil {
+		t.Fatalf("%s failed: not found", name)
+	} else {
+		if bo.GetChecksum() != user.GetChecksum() || bo.GetChecksum() == oldChecksum {
+			t.Fatalf("%s failed: expected %#v (not %#v) but received %#v", name, user.GetChecksum(), oldChecksum, bo.GetChecksum())
+		}
+	}
+}

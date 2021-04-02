@@ -1,9 +1,12 @@
 package henge
 
 import (
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/btnguyen2k/consu/reddo"
 	_ "github.com/btnguyen2k/gocosmos"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/prom"
@@ -53,4 +56,171 @@ func Test_DefaultFilterGeneratorSql(t *testing.T) {
 	if filter := defaultFilterGeneratorSql("", input3); !reflect.DeepEqual(filter, expected) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
 	}
+}
+
+/*----------------------------------------------------------------------*/
+
+func newUser(appVersion uint64, id, maskId string) *User {
+	user := &User{
+		UniversalBo: *NewUniversalBo(id, appVersion),
+	}
+	return user.SetMaskId(maskId).sync()
+}
+
+// // NewUserFromUbo is helper function to create User bo from a universal bo
+// //
+// // available since template-v0.2.0
+// func NewUserFromUbo(ubo *henge.UniversalBo) *User {
+// 	if ubo == nil {
+// 		return nil
+// 	}
+// 	user := User{UniversalBo: *ubo.Clone()}
+// 	if v, err := user.GetExtraAttrAs(userAttr_MaskId, reddo.TypeString); err != nil {
+// 		return nil
+// 	} else {
+// 		user.maskId, _ = v.(string)
+// 	}
+// 	if v, err := user.GetDataAttrAs(userAttr_DisplayName, reddo.TypeString); err != nil {
+// 		return nil
+// 	} else {
+// 		user.displayName, _ = v.(string)
+// 	}
+// 	if v, err := user.GetDataAttrAs(userAttr_IsAdmin, reddo.TypeBool); err != nil {
+// 		return nil
+// 	} else {
+// 		user.isAdmin, _ = v.(bool)
+// 	}
+// 	if v, err := user.GetDataAttrAs(userAttr_Password, reddo.TypeString); err != nil {
+// 		return nil
+// 	} else {
+// 		user.password, _ = v.(string)
+// 	}
+// 	return (&user).sync()
+// }
+
+const (
+	userAttr_MaskId      = "mid"
+	userAttr_Password    = "pwd"
+	userAttr_DisplayName = "dname"
+	userAttr_IsAdmin     = "isadm"
+	userAttr_Ubo         = "_ubo"
+)
+
+// User is the business object
+//	- User inherits unique id from bo.UniversalBo
+//
+// available since template-v0.2.0
+type User struct {
+	UniversalBo `json:"_ubo"`
+	maskId      string `json:"mid"`
+	password    string `json:"pwd"`
+	displayName string `json:"dname"`
+	isAdmin     bool   `json:"isadm"`
+}
+
+func (u *User) ToMap(postFunc FuncPostUboToMap) map[string]interface{} {
+	result := map[string]interface{}{
+		FieldId:              u.GetId(),
+		userAttr_MaskId:      u.maskId,
+		userAttr_IsAdmin:     u.isAdmin,
+		userAttr_DisplayName: u.displayName,
+	}
+	if postFunc != nil {
+		result = postFunc(result)
+	}
+	return result
+}
+
+func (u *User) MarshalJSON() ([]byte, error) {
+	u.sync()
+	m := map[string]interface{}{
+		userAttr_Ubo: u.UniversalBo.Clone(),
+		"_cols": map[string]interface{}{
+			userAttr_MaskId: u.maskId,
+		},
+		"_attrs": map[string]interface{}{
+			userAttr_DisplayName: u.displayName,
+			userAttr_IsAdmin:     u.isAdmin,
+			userAttr_Password:    u.password,
+		},
+	}
+	return json.Marshal(m)
+}
+
+func (u *User) UnmarshalJSON(data []byte) error {
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+	var err error
+	if m[userAttr_Ubo] != nil {
+		js, _ := json.Marshal(m[userAttr_Ubo])
+		if err = json.Unmarshal(js, &u.UniversalBo); err != nil {
+			return err
+		}
+	}
+	if _cols, ok := m["_cols"].(map[string]interface{}); ok {
+		if u.maskId, err = reddo.ToString(_cols[userAttr_MaskId]); err != nil {
+			return err
+		}
+	}
+	if _attrs, ok := m["_attrs"].(map[string]interface{}); ok {
+		if u.displayName, err = reddo.ToString(_attrs[userAttr_DisplayName]); err != nil {
+			return err
+		}
+		if u.isAdmin, err = reddo.ToBool(_attrs[userAttr_IsAdmin]); err != nil {
+			return err
+		}
+		if u.password, err = reddo.ToString(_attrs[userAttr_Password]); err != nil {
+			return err
+		}
+	}
+	u.sync()
+	return nil
+}
+
+func (u *User) GetMaskId() string {
+	return u.maskId
+}
+
+func (u *User) SetMaskId(v string) *User {
+	u.maskId = strings.TrimSpace(strings.ToLower(v))
+	return u
+}
+
+func (u *User) GetPassword() string {
+	return u.password
+}
+
+func (u *User) SetPassword(v string) *User {
+	u.password = strings.TrimSpace(v)
+	return u
+}
+
+func (u *User) GetDisplayName() string {
+	return u.displayName
+}
+
+func (u *User) SetDisplayName(v string) *User {
+	u.displayName = strings.TrimSpace(v)
+	return u
+}
+
+func (u *User) IsAdmin() bool {
+	return u.isAdmin
+}
+
+func (u *User) SetAdmin(v bool) *User {
+	u.isAdmin = v
+	return u
+}
+
+func (u *User) sync() *User {
+	u.SetDataAttr(userAttr_Password, u.password)
+	u.SetDataAttr(userAttr_DisplayName, u.displayName)
+	u.SetDataAttr(userAttr_IsAdmin, u.isAdmin)
+	// u.SetExtraAttr(userAttr_MaskId, u.maskId)
+	u.SetDataAttr(userAttr_MaskId, u.isAdmin)
+	u.UniversalBo.Sync()
+	return u
 }

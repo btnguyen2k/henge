@@ -795,3 +795,57 @@ func TestCosmosdb_SaveExistingUnique(t *testing.T) {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }
+
+func TestCosmosdb_CreateUpdateGet_Checksum(t *testing.T) {
+	name := "TestCosmosdb_CreateUpdateGet_Checksum"
+	tblName := "table_temp"
+	sqlc := _testCosmosdbInitSqlConnect(t, name, tblName)
+	defer sqlc.Close()
+	dao := _testCosmosdbInit(t, name, sqlc, tblName, colCosmosdbPk, "users")
+
+	_tagVersion := uint64(1337)
+	_id := "admin@local"
+	_maskId := "admin"
+	_pwd := "mypassword"
+	_displayName := "Administrator"
+	_isAdmin := true
+	user := newUser(_tagVersion, _id, _maskId)
+	user.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
+	if ok, err := dao.Create(&(user.UniversalBo)); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Create", err)
+	} else if !ok {
+		t.Fatalf("%s failed: cannot create record", name)
+	}
+	if bo, err := dao.Get(_id); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Get", err)
+	} else if bo == nil {
+		t.Fatalf("%s failed: not found", name)
+	} else {
+		if bo.GetChecksum() != user.GetChecksum() {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, user.GetChecksum(), bo.GetChecksum())
+		}
+		fmt.Println(bo.GetChecksum(), user.GetChecksum())
+	}
+
+	oldChecksum := user.GetChecksum()
+	user.SetPassword(_pwd + "-new").SetDisplayName(_displayName + "-new").SetAdmin(!_isAdmin)
+	user.SetDataAttr("name.first", "Thanh2")
+	user.SetDataAttr("name.last", "Nguyen2")
+	user.SetExtraAttr("email", "myname2@mydomain.com")
+	user.SetExtraAttr("age", 37)
+	if ok, err := dao.Update(&(user.UniversalBo)); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Update", err)
+	} else if !ok {
+		t.Fatalf("%s failed: cannot update record", name)
+	}
+	if bo, err := dao.Get(_id); err != nil {
+		t.Fatalf("%s failed: %s", name+"/Get", err)
+	} else if bo == nil {
+		t.Fatalf("%s failed: not found", name)
+	} else {
+		if bo.GetChecksum() != user.GetChecksum() || bo.GetChecksum() == oldChecksum {
+			t.Fatalf("%s failed: expected %#v (not %#v) but received %#v", name, user.GetChecksum(), oldChecksum, bo.GetChecksum())
+		}
+		fmt.Println(oldChecksum, bo.GetChecksum(), user.GetChecksum())
+	}
+}
