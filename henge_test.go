@@ -475,18 +475,18 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 	}
 	if v, err := ubo.GetExtraAttrAsTimeWithLayout("d", TimeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Nanosecond() != now.Nanosecond() {
+	} else if v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(TimeLayout), v.Format(TimeLayout))
 	}
 	if v, err := ubo.GetExtraAttrAsTimeWithLayout("dstr", TimeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Nanosecond() != now.Nanosecond() {
+	} else if v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("d", TimeLayout); v.Nanosecond() != now.Nanosecond() {
+	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("d", TimeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("dstr", TimeLayout); v.Nanosecond() != now.Nanosecond() {
+	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("dstr", TimeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
 }
@@ -521,18 +521,18 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 	}
 	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[0]", TimeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Nanosecond() != now.Nanosecond() {
+	} else if v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(TimeLayout), v.Format(TimeLayout))
 	}
 	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[1]", TimeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Nanosecond() != now.Nanosecond() {
+	} else if v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[0]", TimeLayout); v.Nanosecond() != now.Nanosecond() {
+	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[0]", TimeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[1]", TimeLayout); v.Nanosecond() != now.Nanosecond() {
+	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[1]", TimeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
 }
