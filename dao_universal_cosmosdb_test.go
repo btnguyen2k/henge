@@ -811,6 +811,7 @@ func TestCosmosdb_CreateUpdateGet_Checksum(t *testing.T) {
 	_isAdmin := true
 	user := newUser(_tagVersion, _id, _maskId)
 	user.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
+	user.SetExtraAttr(colCosmosdbPk, "users")
 	if ok, err := dao.Create(&(user.UniversalBo)); err != nil {
 		t.Fatalf("%s failed: %s", name+"/Create", err)
 	} else if !ok {
