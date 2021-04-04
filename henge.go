@@ -104,9 +104,12 @@ const (
 	FieldTimeUpdated = "tupd"
 	// FieldExtras is an internally used field.
 	FieldExtras = "_ext"
+)
 
+var (
 	// TimeLayout is used to convert datetime values to strings and vice versa.
-	TimeLayout = time.RFC3339Nano
+	// TimeLayout = time.RFC3339Nano
+	TimeLayout = time.RFC3339
 )
 
 var (
@@ -272,7 +275,7 @@ func (ubo *UniversalBo) _parseDataJson(dataInit dataInitType) error {
 		} else if dataInit == dataInitSlice {
 			ubo._data = make([]interface{}, 0)
 			err = errorDataInitedAsMap
-		} else {
+		} else if dataInit != dataInitNone {
 			ubo._data = nil
 		}
 	}
@@ -466,7 +469,7 @@ func (ubo *UniversalBo) _sync() *UniversalBo {
 		csumMap := map[string]interface{}{
 			"id":          ubo.id,
 			"app_version": ubo.tagVersion,
-			"t_created":   ubo.timeCreated.Format(TimeLayout),
+			"t_created":   ubo.timeCreated.In(time.UTC).Format(TimeLayout),
 			"data":        ubo._data,
 			"extra":       ubo._extraAttrs,
 		}

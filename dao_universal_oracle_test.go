@@ -665,9 +665,15 @@ func TestOracle_CreateUpdateGet_Checksum(t *testing.T) {
 	_pwd := "mypassword"
 	_displayName := "Administrator"
 	_isAdmin := true
-	user := newUser(_tagVersion, _id, _maskId)
-	user.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
-	if ok, err := dao.Create(&(user.UniversalBo)); err != nil {
+	__email := "myname@mydomain.com"
+	__age := float64(35)
+	user0 := newUser(_tagVersion, _id, _maskId)
+	user0.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
+	user0.SetDataAttr("name.first", "Thanh")
+	user0.SetDataAttr("name.last", "Nguyen")
+	user0.SetExtraAttr("email", __email)
+	user0.SetExtraAttr("age", __age)
+	if ok, err := dao.Create(&(user0.sync().UniversalBo)); err != nil {
 		t.Fatalf("%s failed: %s", name+"/Create", err)
 	} else if !ok {
 		t.Fatalf("%s failed: cannot create record", name)
@@ -677,18 +683,65 @@ func TestOracle_CreateUpdateGet_Checksum(t *testing.T) {
 	} else if bo == nil {
 		t.Fatalf("%s failed: not found", name)
 	} else {
-		if bo.GetChecksum() != user.GetChecksum() {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, user.GetChecksum(), bo.GetChecksum())
+		if v1, v0 := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age); v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if bo.GetChecksum() != user0.GetChecksum() {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), bo.GetChecksum())
+		}
+
+		user1 := newUserFromUbo(bo)
+		if v1, v0 := user1.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age); v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetTagVersion(), _tagVersion; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetId(), _id; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetDisplayName(), _displayName; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetMaskId(), _maskId; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetPassword(), _pwd; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.IsAdmin(), _isAdmin; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if user1.GetChecksum() != user0.GetChecksum() {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), user1.GetChecksum())
 		}
 	}
 
-	oldChecksum := user.GetChecksum()
-	user.SetPassword(_pwd + "-new").SetDisplayName(_displayName + "-new").SetAdmin(!_isAdmin)
-	user.SetDataAttr("name.first", "Thanh2")
-	user.SetDataAttr("name.last", "Nguyen2")
-	user.SetExtraAttr("email", "myname2@mydomain.com")
-	user.SetExtraAttr("age", 37)
-	if ok, err := dao.Update(&(user.UniversalBo)); err != nil {
+	oldChecksum := user0.GetChecksum()
+	user0.SetMaskId(_maskId + "-new").SetPassword(_pwd + "-new").SetDisplayName(_displayName + "-new").SetAdmin(!_isAdmin).SetTagVersion(_tagVersion + 3)
+	user0.SetDataAttr("name.first", "Thanh2")
+	user0.SetDataAttr("name.last", "Nguyen2")
+	user0.SetExtraAttr("email", __email+"-new")
+	user0.SetExtraAttr("age", __age+2)
+	if ok, err := dao.Update(&(user0.sync().UniversalBo)); err != nil {
 		t.Fatalf("%s failed: %s", name+"/Update", err)
 	} else if !ok {
 		t.Fatalf("%s failed: cannot update record", name)
@@ -698,8 +751,58 @@ func TestOracle_CreateUpdateGet_Checksum(t *testing.T) {
 	} else if bo == nil {
 		t.Fatalf("%s failed: not found", name)
 	} else {
-		if bo.GetChecksum() != user.GetChecksum() || bo.GetChecksum() == oldChecksum {
-			t.Fatalf("%s failed: expected %#v (not %#v) but received %#v", name, user.GetChecksum(), oldChecksum, bo.GetChecksum())
+		if v1, v0 := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email+"-new"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age+2); v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if bo.GetChecksum() != user0.GetChecksum() {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), bo.GetChecksum())
+		}
+
+		user1 := newUserFromUbo(bo)
+		if v1, v0 := user1.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email+"-new"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age+2); v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetTagVersion(), _tagVersion+3; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetId(), _id; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetDisplayName(), _displayName+"-new"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetMaskId(), _maskId+"-new"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.GetPassword(), _pwd+"-new"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if v1, v0 := user1.IsAdmin(), !_isAdmin; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		}
+		if user1.GetChecksum() != user0.GetChecksum() {
+			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), user1.GetChecksum())
+		}
+		if user1.GetChecksum() == oldChecksum {
+			t.Fatalf("%s failed: checksum must not be %#v", name, oldChecksum)
 		}
 	}
 }

@@ -140,20 +140,25 @@ func (dao *UniversalDaoSql) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
 	if gbo == nil {
 		return nil
 	}
-	extraFields := make(map[string]interface{})
-	gbo.GboTransferViaJson(&extraFields)
+	extraAttrs := make(map[string]interface{})
+	gbo.GboTransferViaJson(&extraAttrs)
 	for _, field := range topLevelFieldList {
-		delete(extraFields, field)
+		delete(extraAttrs, field)
 	}
-	return &UniversalBo{
+	bo := &UniversalBo{
 		id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
 		dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
 		checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
 		timeCreated: gbo.GboGetAttrUnsafe(FieldTimeCreated, reddo.TypeTime).(time.Time),
 		timeUpdated: gbo.GboGetAttrUnsafe(FieldTimeUpdated, reddo.TypeTime).(time.Time),
 		tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
-		_extraAttrs: extraFields,
+		_extraAttrs: extraAttrs,
+		_dirty:      true,
 	}
+	if err := bo._parseDataJson(dataInitNone); err != nil {
+		return nil
+	}
+	return bo._sync()
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.
@@ -189,8 +194,10 @@ func (dao *UniversalDaoSql) Create(bo *UniversalBo) (bool, error) {
 
 // Get implements UniversalDao.Get.
 func (dao *UniversalDaoSql) Get(id string) (*UniversalBo, error) {
-	filterBo := NewUniversalBo(id, 0)
-	gbo, err := dao.GdaoFetchOne(dao.tableName, dao.GdaoCreateFilter(dao.tableName, dao.ToGenericBo(filterBo)))
+	// filterBo := NewUniversalBo(id, 0)
+	filterBo := &UniversalBo{id: id, _dirty: false}
+	filterGbo := dao.ToGenericBo(filterBo)
+	gbo, err := dao.GdaoFetchOne(dao.tableName, dao.GdaoCreateFilter(dao.tableName, filterGbo))
 	if err != nil {
 		return nil, err
 	}

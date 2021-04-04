@@ -67,36 +67,34 @@ func newUser(appVersion uint64, id, maskId string) *User {
 	return user.SetMaskId(maskId).sync()
 }
 
-// // NewUserFromUbo is helper function to create User bo from a universal bo
-// //
-// // available since template-v0.2.0
-// func NewUserFromUbo(ubo *henge.UniversalBo) *User {
-// 	if ubo == nil {
-// 		return nil
-// 	}
-// 	user := User{UniversalBo: *ubo.Clone()}
-// 	if v, err := user.GetExtraAttrAs(userAttr_MaskId, reddo.TypeString); err != nil {
-// 		return nil
-// 	} else {
-// 		user.maskId, _ = v.(string)
-// 	}
-// 	if v, err := user.GetDataAttrAs(userAttr_DisplayName, reddo.TypeString); err != nil {
-// 		return nil
-// 	} else {
-// 		user.displayName, _ = v.(string)
-// 	}
-// 	if v, err := user.GetDataAttrAs(userAttr_IsAdmin, reddo.TypeBool); err != nil {
-// 		return nil
-// 	} else {
-// 		user.isAdmin, _ = v.(bool)
-// 	}
-// 	if v, err := user.GetDataAttrAs(userAttr_Password, reddo.TypeString); err != nil {
-// 		return nil
-// 	} else {
-// 		user.password, _ = v.(string)
-// 	}
-// 	return (&user).sync()
-// }
+func newUserFromUbo(ubo *UniversalBo) *User {
+	if ubo == nil {
+		return nil
+	}
+	ubo = ubo.Clone()
+	user := &User{UniversalBo: *ubo}
+	if v, err := ubo.GetDataAttrAs(userAttr_MaskId, reddo.TypeString); err != nil {
+		return nil
+	} else {
+		user.maskId, _ = v.(string)
+	}
+	if v, err := ubo.GetDataAttrAs(userAttr_DisplayName, reddo.TypeString); err != nil {
+		return nil
+	} else {
+		user.displayName, _ = v.(string)
+	}
+	if v, err := ubo.GetDataAttrAs(userAttr_IsAdmin, reddo.TypeBool); err != nil {
+		return nil
+	} else {
+		user.isAdmin, _ = v.(bool)
+	}
+	if v, err := ubo.GetDataAttrAs(userAttr_Password, reddo.TypeString); err != nil {
+		return nil
+	} else {
+		user.password, _ = v.(string)
+	}
+	return user.sync()
+}
 
 const (
 	userAttr_MaskId      = "mid"
@@ -219,8 +217,7 @@ func (u *User) sync() *User {
 	u.SetDataAttr(userAttr_Password, u.password)
 	u.SetDataAttr(userAttr_DisplayName, u.displayName)
 	u.SetDataAttr(userAttr_IsAdmin, u.isAdmin)
-	// u.SetExtraAttr(userAttr_MaskId, u.maskId)
-	u.SetDataAttr(userAttr_MaskId, u.isAdmin)
+	u.SetDataAttr(userAttr_MaskId, u.maskId)
 	u.UniversalBo.Sync()
 	return u
 }
