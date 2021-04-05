@@ -144,11 +144,11 @@ const (
 	TimestampRoundSettingNone TimestampRoundSetting = iota
 	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to nanosecond.
 	TimestampRoundSettingNanosecond
-	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to microsecond.
+	// TimestampRoundSettingMicrosecond specifies that timestamp is rounded to microsecond.
 	TimestampRoundSettingMicrosecond
-	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to millisecond.
+	// TimestampRoundSettingMillisecond specifies that timestamp is rounded to millisecond.
 	TimestampRoundSettingMillisecond
-	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to second.
+	// TimestampRoundSettingSecond specifies that timestamp is rounded to second.
 	TimestampRoundSettingSecond
 )
 
