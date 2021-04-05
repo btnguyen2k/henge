@@ -20,7 +20,7 @@ import (
 
 const (
 	// Version of package henge.
-	Version = "0.4.0"
+	Version = "0.4.1"
 )
 
 // clone a map, deep clone if possible.
@@ -140,10 +140,15 @@ const (
 type TimestampRoundSetting int
 
 const (
+	// TimestampRoundSettingNone specifies that timestamp is not rounded.
 	TimestampRoundSettingNone TimestampRoundSetting = iota
+	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to nanosecond.
 	TimestampRoundSettingNanosecond
+	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to microsecond.
 	TimestampRoundSettingMicrosecond
+	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to millisecond.
 	TimestampRoundSettingMillisecond
+	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to second.
 	TimestampRoundSettingSecond
 )
 
@@ -152,6 +157,7 @@ var (
 	// Note: since v0.4.1 TimeLayout is a variable, no longer a const.
 	TimeLayout = time.RFC3339
 
+	// TimestampRounding controls how UniversalBo would round timestamp before storing.
 	TimestampRounding TimestampRoundSetting = TimestampRoundSettingSecond
 )
 
