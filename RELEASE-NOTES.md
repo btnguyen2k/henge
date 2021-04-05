@@ -1,5 +1,13 @@
 # henge release notes
 
+## 2021-04-05 - v0.4.1
+
+- Fix checksum value mismatched when storing to/retrieving from storage.
+- New public variable `hange.TimeLayout` to control datetime format (default value is `time.RFC3339`).
+- New public variable `henge.TimestampRounding` to control how `UniversalBo` would round timestamp before storing.
+- Other fixes and enhancements.
+
+
 ## 2021-03-24 - v0.4.0
 
 - Bump `btnguyen2k/godal` to `v0.4.0`.

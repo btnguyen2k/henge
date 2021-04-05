@@ -73,22 +73,22 @@ func newUserFromUbo(ubo *UniversalBo) *User {
 	}
 	ubo = ubo.Clone()
 	user := &User{UniversalBo: *ubo}
-	if v, err := ubo.GetDataAttrAs(userAttr_MaskId, reddo.TypeString); err != nil {
+	if v, err := ubo.GetDataAttrAs(userAttrMaskId, reddo.TypeString); err != nil {
 		return nil
 	} else {
 		user.maskId, _ = v.(string)
 	}
-	if v, err := ubo.GetDataAttrAs(userAttr_DisplayName, reddo.TypeString); err != nil {
+	if v, err := ubo.GetDataAttrAs(userAttrDisplayName, reddo.TypeString); err != nil {
 		return nil
 	} else {
 		user.displayName, _ = v.(string)
 	}
-	if v, err := ubo.GetDataAttrAs(userAttr_IsAdmin, reddo.TypeBool); err != nil {
+	if v, err := ubo.GetDataAttrAs(userAttrIsAdmin, reddo.TypeBool); err != nil {
 		return nil
 	} else {
 		user.isAdmin, _ = v.(bool)
 	}
-	if v, err := ubo.GetDataAttrAs(userAttr_Password, reddo.TypeString); err != nil {
+	if v, err := ubo.GetDataAttrAs(userAttrPassword, reddo.TypeString); err != nil {
 		return nil
 	} else {
 		user.password, _ = v.(string)
@@ -97,11 +97,11 @@ func newUserFromUbo(ubo *UniversalBo) *User {
 }
 
 const (
-	userAttr_MaskId      = "mid"
-	userAttr_Password    = "pwd"
-	userAttr_DisplayName = "dname"
-	userAttr_IsAdmin     = "isadm"
-	userAttr_Ubo         = "_ubo"
+	userAttrMaskId      = "mid"
+	userAttrPassword    = "pwd"
+	userAttrDisplayName = "dname"
+	userAttrIsAdmin     = "isadm"
+	userAttrUbo         = "_ubo"
 )
 
 // User is the business object
@@ -118,10 +118,10 @@ type User struct {
 
 func (u *User) ToMap(postFunc FuncPostUboToMap) map[string]interface{} {
 	result := map[string]interface{}{
-		FieldId:              u.GetId(),
-		userAttr_MaskId:      u.maskId,
-		userAttr_IsAdmin:     u.isAdmin,
-		userAttr_DisplayName: u.displayName,
+		FieldId:             u.GetId(),
+		userAttrMaskId:      u.maskId,
+		userAttrIsAdmin:     u.isAdmin,
+		userAttrDisplayName: u.displayName,
 	}
 	if postFunc != nil {
 		result = postFunc(result)
@@ -132,14 +132,14 @@ func (u *User) ToMap(postFunc FuncPostUboToMap) map[string]interface{} {
 func (u *User) MarshalJSON() ([]byte, error) {
 	u.sync()
 	m := map[string]interface{}{
-		userAttr_Ubo: u.UniversalBo.Clone(),
+		userAttrUbo: u.UniversalBo.Clone(),
 		"_cols": map[string]interface{}{
-			userAttr_MaskId: u.maskId,
+			userAttrMaskId: u.maskId,
 		},
 		"_attrs": map[string]interface{}{
-			userAttr_DisplayName: u.displayName,
-			userAttr_IsAdmin:     u.isAdmin,
-			userAttr_Password:    u.password,
+			userAttrDisplayName: u.displayName,
+			userAttrIsAdmin:     u.isAdmin,
+			userAttrPassword:    u.password,
 		},
 	}
 	return json.Marshal(m)
@@ -151,25 +151,25 @@ func (u *User) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var err error
-	if m[userAttr_Ubo] != nil {
-		js, _ := json.Marshal(m[userAttr_Ubo])
+	if m[userAttrUbo] != nil {
+		js, _ := json.Marshal(m[userAttrUbo])
 		if err = json.Unmarshal(js, &u.UniversalBo); err != nil {
 			return err
 		}
 	}
 	if _cols, ok := m["_cols"].(map[string]interface{}); ok {
-		if u.maskId, err = reddo.ToString(_cols[userAttr_MaskId]); err != nil {
+		if u.maskId, err = reddo.ToString(_cols[userAttrMaskId]); err != nil {
 			return err
 		}
 	}
 	if _attrs, ok := m["_attrs"].(map[string]interface{}); ok {
-		if u.displayName, err = reddo.ToString(_attrs[userAttr_DisplayName]); err != nil {
+		if u.displayName, err = reddo.ToString(_attrs[userAttrDisplayName]); err != nil {
 			return err
 		}
-		if u.isAdmin, err = reddo.ToBool(_attrs[userAttr_IsAdmin]); err != nil {
+		if u.isAdmin, err = reddo.ToBool(_attrs[userAttrIsAdmin]); err != nil {
 			return err
 		}
-		if u.password, err = reddo.ToString(_attrs[userAttr_Password]); err != nil {
+		if u.password, err = reddo.ToString(_attrs[userAttrPassword]); err != nil {
 			return err
 		}
 	}
@@ -214,10 +214,10 @@ func (u *User) SetAdmin(v bool) *User {
 }
 
 func (u *User) sync() *User {
-	u.SetDataAttr(userAttr_Password, u.password)
-	u.SetDataAttr(userAttr_DisplayName, u.displayName)
-	u.SetDataAttr(userAttr_IsAdmin, u.isAdmin)
-	u.SetDataAttr(userAttr_MaskId, u.maskId)
+	u.SetDataAttr(userAttrPassword, u.password)
+	u.SetDataAttr(userAttrDisplayName, u.displayName)
+	u.SetDataAttr(userAttrIsAdmin, u.isAdmin)
+	u.SetDataAttr(userAttrMaskId, u.maskId)
 	u.UniversalBo.Sync()
 	return u
 }
