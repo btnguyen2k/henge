@@ -198,6 +198,19 @@ func (dao *UniversalDaoCosmosdbSql) GetPkValue() string {
 	return dao.pkValue
 }
 
+var cosmosdbFields = []string{"_attachments", "_etag", "_rid", "_self", "_ts"}
+
+// ToUniversalBo transforms godal.IGenericBo to business object.
+func (dao *UniversalDaoCosmosdbSql) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
+	if gbo != nil {
+		// remove CosmosDB's specific fields
+		for _, field := range cosmosdbFields {
+			gbo.GboSetAttr(field, nil)
+		}
+	}
+	return dao.UniversalDaoSql.ToUniversalBo(gbo)
+}
+
 // Get implements UniversalDao.Get.
 func (dao *UniversalDaoCosmosdbSql) Get(id string) (*UniversalBo, error) {
 	filter := map[string]interface{}{CosmosdbColId: id}

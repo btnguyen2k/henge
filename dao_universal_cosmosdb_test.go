@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btnguyen2k/consu/checksum"
 	"github.com/btnguyen2k/consu/reddo"
 	_ "github.com/btnguyen2k/gocosmos"
 	"github.com/btnguyen2k/godal"
@@ -812,6 +813,7 @@ func TestCosmosdb_CreateUpdateGet_Checksum(t *testing.T) {
 	__email := "myname@mydomain.com"
 	__age := float64(35)
 	user0 := newUser(_tagVersion, _id, _maskId)
+	user0.SetExtraAttr(colCosmosdbPk, "users")
 	user0.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
 	user0.SetDataAttr("name.first", "Thanh")
 	user0.SetDataAttr("name.last", "Nguyen")
@@ -840,6 +842,26 @@ func TestCosmosdb_CreateUpdateGet_Checksum(t *testing.T) {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
 		if bo.GetChecksum() != user0.GetChecksum() {
+			csumMap := map[string]interface{}{
+				"id":          bo.id,
+				"app_version": bo.tagVersion,
+				"t_created":   bo.timeCreated.In(time.UTC).Format(TimeLayout),
+				"data":        bo._data,
+				"extra":       bo._extraAttrs,
+			}
+			csum := fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
+			fmt.Printf("DEBUG: %s - %s / %s\n", bo.GetChecksum(), csum, csumMap)
+
+			csumMap = map[string]interface{}{
+				"id":          user0.id,
+				"app_version": user0.tagVersion,
+				"t_created":   user0.timeCreated.In(time.UTC).Format(TimeLayout),
+				"data":        user0._data,
+				"extra":       user0._extraAttrs,
+			}
+			csum = fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
+			fmt.Printf("DEBUG: %s - %s / %s\n", user0.GetChecksum(), csum, csumMap)
+			
 			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), bo.GetChecksum())
 		}
 
