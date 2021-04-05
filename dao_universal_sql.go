@@ -137,28 +137,29 @@ func (dao *UniversalDaoSql) GdaoCreateFilter(tableName string, bo godal.IGeneric
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoSql) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
-	if gbo == nil {
-		return nil
-	}
-	extraAttrs := make(map[string]interface{})
-	gbo.GboTransferViaJson(&extraAttrs)
-	for _, field := range topLevelFieldList {
-		delete(extraAttrs, field)
-	}
-	bo := &UniversalBo{
-		id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
-		dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
-		checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
-		timeCreated: gbo.GboGetAttrUnsafe(FieldTimeCreated, reddo.TypeTime).(time.Time),
-		timeUpdated: gbo.GboGetAttrUnsafe(FieldTimeUpdated, reddo.TypeTime).(time.Time),
-		tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
-		_extraAttrs: extraAttrs,
-		_dirty:      true,
-	}
-	if err := bo._parseDataJson(dataInitNone); err != nil {
-		return nil
-	}
-	return bo._sync()
+	return NewUniversalBoFromGbo(gbo)
+	// if gbo == nil {
+	// 	return nil
+	// }
+	// extraAttrs := make(map[string]interface{})
+	// gbo.GboTransferViaJson(&extraAttrs)
+	// for _, field := range topLevelFieldList {
+	// 	delete(extraAttrs, field)
+	// }
+	// bo := &UniversalBo{
+	// 	id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
+	// 	dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
+	// 	checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
+	// 	timeCreated: gbo.GboGetAttrUnsafe(FieldTimeCreated, reddo.TypeTime).(time.Time),
+	// 	timeUpdated: gbo.GboGetAttrUnsafe(FieldTimeUpdated, reddo.TypeTime).(time.Time),
+	// 	tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
+	// 	_extraAttrs: extraAttrs,
+	// 	_dirty:      true,
+	// }
+	// if err := bo._parseDataJson(dataInitNone); err != nil {
+	// 	return nil
+	// }
+	// return bo._sync()
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.
@@ -166,18 +167,19 @@ func (dao *UniversalDaoSql) ToGenericBo(ubo *UniversalBo) godal.IGenericBo {
 	if ubo == nil {
 		return nil
 	}
-	ubo = ubo.Clone()
-	gbo := godal.NewGenericBo()
-	gbo.GboSetAttr(FieldId, ubo.id)
-	gbo.GboSetAttr(FieldData, ubo.dataJson)
-	gbo.GboSetAttr(FieldChecksum, ubo.checksum)
-	gbo.GboSetAttr(FieldTimeCreated, ubo.timeCreated)
-	gbo.GboSetAttr(FieldTimeUpdated, ubo.timeUpdated)
-	gbo.GboSetAttr(FieldTagVersion, ubo.tagVersion)
-	for k, v := range ubo._extraAttrs {
-		gbo.GboSetAttr(k, v)
-	}
-	return gbo
+	return ubo.ToGenericBo()
+	// ubo = ubo.Clone()
+	// gbo := godal.NewGenericBo()
+	// gbo.GboSetAttr(FieldId, ubo.id)
+	// gbo.GboSetAttr(FieldData, ubo.dataJson)
+	// gbo.GboSetAttr(FieldChecksum, ubo.checksum)
+	// gbo.GboSetAttr(FieldTimeCreated, ubo.timeCreated)
+	// gbo.GboSetAttr(FieldTimeUpdated, ubo.timeUpdated)
+	// gbo.GboSetAttr(FieldTagVersion, ubo.tagVersion)
+	// for k, v := range ubo._extraAttrs {
+	// 	gbo.GboSetAttr(k, v)
+	// }
+	// return gbo
 }
 
 // Delete implements UniversalDao.Delete.

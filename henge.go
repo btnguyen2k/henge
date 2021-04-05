@@ -89,6 +89,38 @@ func NewUniversalBo(id string, tagVersion uint64) *UniversalBo {
 	return bo.Sync()
 }
 
+// NewUniversalBoFromGbo is helper function to construct a new UniversalBo from transforms godal.IGenericBo.
+//
+// Available since v0.4.1
+func NewUniversalBoFromGbo(gbo godal.IGenericBo) *UniversalBo {
+	if gbo == nil {
+		return nil
+	}
+	extraAttrs := make(map[string]interface{})
+	gbo.GboTransferViaJson(&extraAttrs)
+	for _, field := range topLevelFieldList {
+		delete(extraAttrs, field)
+	}
+	tcreated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
+	tupdated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
+	bo := &UniversalBo{
+		id:       gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
+		dataJson: gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
+		checksum: gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
+		// timeCreated: gbo.GboGetAttrUnsafe(FieldTimeCreated, reddo.TypeTime).(time.Time),
+		// timeUpdated: gbo.GboGetAttrUnsafe(FieldTimeUpdated, reddo.TypeTime).(time.Time),
+		timeCreated: tcreated,
+		timeUpdated: tupdated,
+		tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
+		_extraAttrs: extraAttrs,
+		_dirty:      true,
+	}
+	if err := bo._parseDataJson(dataInitNone); err != nil {
+		return nil
+	}
+	return bo._sync()
+}
+
 const (
 	// FieldId is a top level field: BO's unique id.
 	FieldId = "id"
@@ -107,8 +139,10 @@ const (
 )
 
 var (
-	// TimeLayout is used to convert datetime values to strings and vice versa.
 	// TimeLayout = time.RFC3339Nano
+
+	// TimeLayout is used to convert datetime values to strings and vice versa.
+	// Note: since v0.4.1 TimeLayout is a variable, no longer a const.
 	TimeLayout = time.RFC3339
 )
 
@@ -156,6 +190,25 @@ var DefaultFuncPreUboToMap FuncPreUboToMap = func(_ubo *UniversalBo) map[string]
 		FieldTimeUpdated: ubo.timeUpdated,
 		FieldExtras:      cloneMap(ubo._extraAttrs),
 	}
+}
+
+// ToGenericBo exports the BO data to a godal.IGenericBo.
+//   - the exported godal.IGenericBo is populated with fields FieldId, FieldData, FieldChecksum, FieldTimeCreated, FieldTimeUpdated and FieldTagVersion.
+//
+// Available since v0.4.1
+func (ubo *UniversalBo) ToGenericBo() godal.IGenericBo {
+	clone := ubo.Clone()
+	gbo := godal.NewGenericBo()
+	gbo.GboSetAttr(FieldId, clone.id)
+	gbo.GboSetAttr(FieldData, clone.dataJson)
+	gbo.GboSetAttr(FieldChecksum, clone.checksum)
+	gbo.GboSetAttr(FieldTimeCreated, clone.timeCreated)
+	gbo.GboSetAttr(FieldTimeUpdated, clone.timeUpdated)
+	gbo.GboSetAttr(FieldTagVersion, clone.tagVersion)
+	for k, v := range clone._extraAttrs {
+		gbo.GboSetAttr(k, v)
+	}
+	return gbo
 }
 
 // ToMap exports the BO data to a map[string]interface{}.

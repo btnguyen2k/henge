@@ -776,6 +776,26 @@ func TestMongo_CreateUpdateGet_Checksum(t *testing.T) {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
 		if user1.GetChecksum() != user0.GetChecksum() {
+			// csumMap := map[string]interface{}{
+			// 	"id":          user1.id,
+			// 	"app_version": user1.tagVersion,
+			// 	"t_created":   user1.timeCreated.In(time.UTC).Format(TimeLayout),
+			// 	"data":        user1._data,
+			// 	"extra":       user1._extraAttrs,
+			// }
+			// csum := fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
+			// fmt.Printf("DEBUG: %s - %s / %s\n", user1.GetChecksum(), csum, csumMap)
+			//
+			// csumMap = map[string]interface{}{
+			// 	"id":          user0.id,
+			// 	"app_version": user0.tagVersion,
+			// 	"t_created":   user0.timeCreated.In(time.UTC).Format(TimeLayout),
+			// 	"data":        user0._data,
+			// 	"extra":       user0._extraAttrs,
+			// }
+			// csum = fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
+			// fmt.Printf("DEBUG: %s - %s / %s\n", user0.GetChecksum(), csum, csumMap)
+
 			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), user1.GetChecksum())
 		}
 	}
