@@ -77,7 +77,7 @@ func cloneSlice(src []interface{}) []interface{} {
 //
 // Note: id will be space-trimmed.
 func NewUniversalBo(id string, tagVersion uint64) *UniversalBo {
-	now := time.Now()
+	now := roundTimestamp(time.Now(), TimestampRounding)
 	bo := &UniversalBo{
 		id:          strings.TrimSpace(id),
 		timeCreated: now,
@@ -104,11 +104,9 @@ func NewUniversalBoFromGbo(gbo godal.IGenericBo) *UniversalBo {
 	tcreated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
 	tupdated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
 	bo := &UniversalBo{
-		id:       gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
-		dataJson: gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
-		checksum: gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
-		// timeCreated: gbo.GboGetAttrUnsafe(FieldTimeCreated, reddo.TypeTime).(time.Time),
-		// timeUpdated: gbo.GboGetAttrUnsafe(FieldTimeUpdated, reddo.TypeTime).(time.Time),
+		id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
+		dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
+		checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
 		timeCreated: tcreated,
 		timeUpdated: tupdated,
 		tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
@@ -138,13 +136,40 @@ const (
 	FieldExtras = "_ext"
 )
 
-var (
-	// TimeLayout = time.RFC3339Nano
+// TimestampRoundSetting specifies how UniversalBo would round timestamp before storing.
+type TimestampRoundSetting int
 
+const (
+	TimestampRoundSettingNone TimestampRoundSetting = iota
+	TimestampRoundSettingNanosecond
+	TimestampRoundSettingMicrosecond
+	TimestampRoundSettingMillisecond
+	TimestampRoundSettingSecond
+)
+
+var (
 	// TimeLayout is used to convert datetime values to strings and vice versa.
 	// Note: since v0.4.1 TimeLayout is a variable, no longer a const.
 	TimeLayout = time.RFC3339
+
+	TimestampRounding TimestampRoundSetting = TimestampRoundSettingSecond
 )
+
+// roundTimestamp round the input time and return the result.
+// available since v0.4.0
+func roundTimestamp(t time.Time, trs TimestampRoundSetting) time.Time {
+	switch trs {
+	case TimestampRoundSettingNanosecond:
+		return t
+	case TimestampRoundSettingMicrosecond:
+		return t.Round(time.Microsecond)
+	case TimestampRoundSettingMillisecond:
+		return t.Round(time.Millisecond)
+	case TimestampRoundSettingSecond:
+		return t.Round(time.Second)
+	}
+	return t
+}
 
 var (
 	topLevelFieldList = []string{FieldId, FieldData, FieldChecksum, FieldTagVersion, FieldTimeCreated, FieldTimeUpdated}
@@ -455,8 +480,10 @@ func (ubo *UniversalBo) SetDataAttr(path string, value interface{}) error {
 	switch value.(type) {
 	case time.Time:
 		value, _ = time.Parse(TimeLayout, value.(time.Time).Format(TimeLayout))
+		value = roundTimestamp(value.(time.Time), TimestampRounding)
 	case *time.Time:
 		value, _ = time.Parse(TimeLayout, value.(*time.Time).Format(TimeLayout))
+		value = roundTimestamp(value.(time.Time), TimestampRounding)
 	}
 	return ubo._sdata.SetValue(path, value)
 }
@@ -509,8 +536,10 @@ func (ubo *UniversalBo) SetExtraAttr(key string, value interface{}) *UniversalBo
 	switch value.(type) {
 	case time.Time:
 		value, _ = time.Parse(TimeLayout, value.(time.Time).Format(TimeLayout))
+		value = roundTimestamp(value.(time.Time), TimestampRounding)
 	case *time.Time:
 		value, _ = time.Parse(TimeLayout, value.(*time.Time).Format(TimeLayout))
+		value = roundTimestamp(value.(time.Time), TimestampRounding)
 	}
 	ubo._extraAttrs[key] = value
 	return ubo
@@ -518,7 +547,7 @@ func (ubo *UniversalBo) SetExtraAttr(key string, value interface{}) *UniversalBo
 
 func (ubo *UniversalBo) _sync() *UniversalBo {
 	if ubo._dirty {
-		ubo.timeUpdated = time.Now()
+		ubo.timeUpdated = roundTimestamp(time.Now(), TimestampRounding)
 		csumMap := map[string]interface{}{
 			"id":          ubo.id,
 			"app_version": ubo.tagVersion,
