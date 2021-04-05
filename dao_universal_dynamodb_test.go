@@ -948,14 +948,14 @@ func TestDynamodb_CreateUpdateGet_Checksum(t *testing.T) {
 	_pwd := "mypassword"
 	_displayName := "Administrator"
 	_isAdmin := true
-	__email := "myname@mydomain.com"
-	__age := float64(35)
+	_Email := "myname@mydomain.com"
+	_Age := float64(35)
 	user0 := newUser(_tagVersion, _id, _maskId)
 	user0.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
 	user0.SetDataAttr("name.first", "Thanh")
 	user0.SetDataAttr("name.last", "Nguyen")
-	user0.SetExtraAttr("email", __email)
-	user0.SetExtraAttr("age", __age)
+	user0.SetExtraAttr("email", _Email)
+	user0.SetExtraAttr("age", _Age)
 	if ok, err := dao.Create(&(user0.sync().UniversalBo)); err != nil {
 		t.Fatalf("%s failed: %s", name+"/Create", err)
 	} else if !ok {
@@ -972,10 +972,10 @@ func TestDynamodb_CreateUpdateGet_Checksum(t *testing.T) {
 		if v1, v0 := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen"; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email; v1 != v0 {
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age); v1 != v0 {
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age); v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
 		if bo.GetChecksum() != user0.GetChecksum() {
@@ -989,10 +989,10 @@ func TestDynamodb_CreateUpdateGet_Checksum(t *testing.T) {
 		if v1, v0 := user1.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen"; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email; v1 != v0 {
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age); v1 != v0 {
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age); v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
 		if v1, v0 := user1.GetTagVersion(), _tagVersion; v1 != v0 {
@@ -1022,8 +1022,8 @@ func TestDynamodb_CreateUpdateGet_Checksum(t *testing.T) {
 	user0.SetMaskId(_maskId + "-new").SetPassword(_pwd + "-new").SetDisplayName(_displayName + "-new").SetAdmin(!_isAdmin).SetTagVersion(_tagVersion + 3)
 	user0.SetDataAttr("name.first", "Thanh2")
 	user0.SetDataAttr("name.last", "Nguyen2")
-	user0.SetExtraAttr("email", __email+"-new")
-	user0.SetExtraAttr("age", __age+2)
+	user0.SetExtraAttr("email", _Email+"-new")
+	user0.SetExtraAttr("age", _Age+2)
 	if ok, err := dao.Update(&(user0.sync().UniversalBo)); err != nil {
 		t.Fatalf("%s failed: %s", name+"/Update", err)
 	} else if !ok {
@@ -1040,10 +1040,10 @@ func TestDynamodb_CreateUpdateGet_Checksum(t *testing.T) {
 		if v1, v0 := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email+"-new"; v1 != v0 {
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email+"-new"; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age+2); v1 != v0 {
+		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age+2); v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
 		if bo.GetChecksum() != user0.GetChecksum() {
@@ -1057,10 +1057,10 @@ func TestDynamodb_CreateUpdateGet_Checksum(t *testing.T) {
 		if v1, v0 := user1.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), __email+"-new"; v1 != v0 {
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email+"-new"; v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
-		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(__age+2); v1 != v0 {
+		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age+2); v1 != v0 {
 			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
 		}
 		if v1, v0 := user1.GetTagVersion(), _tagVersion+3; v1 != v0 {
