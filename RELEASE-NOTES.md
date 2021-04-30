@@ -1,5 +1,10 @@
 # henge release notes
 
+## 2021-04-30 - v0.5.0
+
+- Migrate to `btnguyen2k/godal v0.5.0`: implement `godal.SortingOpt` and `godal.FilterOpt`.
+
+
 ## 2021-04-05 - v0.4.1
 
 - Fix checksum value mismatched when storing to/retrieving from storage.
