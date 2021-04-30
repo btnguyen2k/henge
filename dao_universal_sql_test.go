@@ -35,8 +35,9 @@ func TestNewSqlConnection(t *testing.T) {
 func Test_DefaultFilterGeneratorSql(t *testing.T) {
 	name := "Test_DefaultFilterGeneratorSql"
 
+	var expected godal.FilterOpt
 	input := NewUniversalBo("myid", 1234)
-	expected := map[string]interface{}{SqlColId: "myid"}
+	expected = &godal.FilterOptFieldOpValue{FieldName: FieldId, Operator: godal.FilterOpEqual, Value: "myid"}
 	if filter := defaultFilterGeneratorSql("", input); !reflect.DeepEqual(filter, expected) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
 	}
@@ -46,13 +47,13 @@ func Test_DefaultFilterGeneratorSql(t *testing.T) {
 
 	input2 := godal.NewGenericBo()
 	input2.GboSetAttr(FieldId, "myid2")
-	expected = map[string]interface{}{SqlColId: "myid2"}
+	expected = &godal.FilterOptFieldOpValue{FieldName: FieldId, Operator: godal.FilterOpEqual, Value: "myid2"}
 	if filter := defaultFilterGeneratorSql("", input2); !reflect.DeepEqual(filter, expected) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
 	}
 
-	input3 := map[string]interface{}{"filter": "value"}
-	expected = map[string]interface{}{"filter": "value"}
+	input3 := godal.MakeFilter(map[string]interface{}{FieldId: "myid3"})
+	expected = &godal.FilterOptFieldOpValue{FieldName: FieldId, Operator: godal.FilterOpEqual, Value: "myid3"}
 	if filter := defaultFilterGeneratorSql("", input3); !reflect.DeepEqual(filter, expected) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
 	}
