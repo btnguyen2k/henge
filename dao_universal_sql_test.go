@@ -73,24 +73,32 @@ func newUserFromUbo(ubo *UniversalBo) *User {
 	}
 	ubo = ubo.Clone()
 	user := &User{UniversalBo: *ubo}
-	if v, err := ubo.GetDataAttrAs(userAttrMaskId, reddo.TypeString); err != nil {
-		return nil
-	} else {
+	{
+		v, err := ubo.GetDataAttrAs(userAttrMaskId, reddo.TypeString)
+		if err != nil {
+			return nil
+		}
 		user.maskId, _ = v.(string)
 	}
-	if v, err := ubo.GetDataAttrAs(userAttrDisplayName, reddo.TypeString); err != nil {
-		return nil
-	} else {
+	{
+		v, err := ubo.GetDataAttrAs(userAttrDisplayName, reddo.TypeString)
+		if err != nil {
+			return nil
+		}
 		user.displayName, _ = v.(string)
 	}
-	if v, err := ubo.GetDataAttrAs(userAttrIsAdmin, reddo.TypeBool); err != nil {
-		return nil
-	} else {
+	{
+		v, err := ubo.GetDataAttrAs(userAttrIsAdmin, reddo.TypeBool)
+		if err != nil {
+			return nil
+		}
 		user.isAdmin, _ = v.(bool)
 	}
-	if v, err := ubo.GetDataAttrAs(userAttrPassword, reddo.TypeString); err != nil {
-		return nil
-	} else {
+	{
+		v, err := ubo.GetDataAttrAs(userAttrPassword, reddo.TypeString)
+		if err != nil {
+			return nil
+		}
 		user.password, _ = v.(string)
 	}
 	return user.sync()
