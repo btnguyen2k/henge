@@ -26,6 +26,22 @@ type rowMapperMongo struct {
 	wrap godal.IRowMapper
 }
 
+func (r *rowMapperMongo) ToDbColName(_, fieldName string) string {
+	// MongoDB is schemaless, field-name should also be column-name
+	if fieldName == FieldId {
+		return MongoColId
+	}
+	return fieldName
+}
+
+func (r *rowMapperMongo) ToBoFieldName(_, colName string) string {
+	// MongoDB is schemaless, field-name should also be column-name
+	if colName == MongoColId {
+		return FieldId
+	}
+	return colName
+}
+
 // ToRow implements godal.IRowMapper.ToRow.
 func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
 	row, err := r.wrap.ToRow(storageId, bo)
@@ -96,30 +112,13 @@ type UniversalDaoMongo struct {
 }
 
 // GdaoCreateFilter implements IGenericDao.GdaoCreateFilter.
-func (dao *UniversalDaoMongo) GdaoCreateFilter(_ string, bo godal.IGenericBo) interface{} {
-	return map[string]interface{}{MongoColId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+func (dao *UniversalDaoMongo) GdaoCreateFilter(_ string, bo godal.IGenericBo) godal.FilterOpt {
+	return godal.MakeFilter(map[string]interface{}{MongoColId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)})
 }
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoMongo) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
 	return NewUniversalBoFromGbo(gbo)
-	// if gbo == nil {
-	// 	return nil
-	// }
-	// extraFields := make(map[string]interface{})
-	// gbo.GboTransferViaJson(&extraFields)
-	// for _, field := range topLevelFieldList {
-	// 	delete(extraFields, field)
-	// }
-	// return &UniversalBo{
-	// 	id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
-	// 	dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
-	// 	checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
-	// 	timeCreated: gbo.GboGetAttrUnsafe(FieldTimeCreated, reddo.TypeTime).(time.Time),
-	// 	timeUpdated: gbo.GboGetAttrUnsafe(FieldTimeUpdated, reddo.TypeTime).(time.Time),
-	// 	tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
-	// 	_extraAttrs: extraFields,
-	// }
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.
@@ -128,18 +127,6 @@ func (dao *UniversalDaoMongo) ToGenericBo(ubo *UniversalBo) godal.IGenericBo {
 		return nil
 	}
 	return ubo.ToGenericBo()
-	// ubo = ubo.Clone()
-	// gbo := godal.NewGenericBo()
-	// gbo.GboSetAttr(FieldId, ubo.id)
-	// gbo.GboSetAttr(FieldData, ubo.dataJson)
-	// gbo.GboSetAttr(FieldChecksum, ubo.checksum)
-	// gbo.GboSetAttr(FieldTimeCreated, ubo.timeCreated)
-	// gbo.GboSetAttr(FieldTimeUpdated, ubo.timeUpdated)
-	// gbo.GboSetAttr(FieldTagVersion, ubo.tagVersion)
-	// for k, v := range ubo._extraAttrs {
-	// 	gbo.GboSetAttr(k, v)
-	// }
-	// return gbo
 }
 
 // Delete implements UniversalDao.Delete.
@@ -156,7 +143,9 @@ func (dao *UniversalDaoMongo) Create(bo *UniversalBo) (bool, error) {
 
 // Get implements UniversalDao.Get.
 func (dao *UniversalDaoMongo) Get(id string) (*UniversalBo, error) {
-	gbo, err := dao.GdaoFetchOne(dao.collectionName, map[string]interface{}{MongoColId: id})
+	filterBo := NewUniversalBo(id, 0)
+	filter := dao.GdaoCreateFilter(dao.collectionName, filterBo.ToGenericBo())
+	gbo, err := dao.GdaoFetchOne(dao.collectionName, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -164,10 +153,10 @@ func (dao *UniversalDaoMongo) Get(id string) (*UniversalBo, error) {
 }
 
 // GetN implements UniversalDao.GetN.
-func (dao *UniversalDaoMongo) GetN(fromOffset, maxNumRows int, filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoMongo) GetN(fromOffset, maxNumRows int, filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	if sorting == nil {
 		// default sorting: ascending by "id" column
-		sorting = map[string]int{MongoColId: 1}
+		sorting = (&godal.SortingField{FieldName: MongoColId}).ToSortingOpt()
 	}
 	gboList, err := dao.GdaoFetchMany(dao.collectionName, filter, sorting, fromOffset, maxNumRows)
 	if err != nil {
@@ -182,7 +171,7 @@ func (dao *UniversalDaoMongo) GetN(fromOffset, maxNumRows int, filter interface{
 }
 
 // GetAll implements UniversalDao.GetAll.
-func (dao *UniversalDaoMongo) GetAll(filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoMongo) GetAll(filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	return dao.GetN(0, 0, filter, sorting)
 }
 

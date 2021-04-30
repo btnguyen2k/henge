@@ -11,7 +11,6 @@ import (
 
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
-	"github.com/btnguyen2k/godal/sql"
 	"github.com/btnguyen2k/prom"
 	_ "github.com/godror/godror"
 )
@@ -133,7 +132,7 @@ func TestOracle_CreateExistingPK(t *testing.T) {
 	}
 
 	ubo.SetExtraAttr("email", "myname2@mydomain.com")
-	if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+	if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
 		t.Fatalf("%s failed: record should not be created twice", name)
@@ -158,7 +157,7 @@ func TestOracle_CreateExistingUnique(t *testing.T) {
 	}
 
 	ubo.SetId("id2")
-	if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+	if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
 		t.Fatalf("%s failed: record should not be created twice", name)
@@ -298,7 +297,7 @@ func TestOracle_CreateGetManyWithFilter(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_age", Operator: ">=", Value: 35 + 3}
+	filter := &godal.FilterOptFieldOpValue{FieldName: "age", Operator: godal.FilterOpGreaterOrEqual, Value: 35 + 3}
 	if boList, err := dao.GetAll(filter, nil); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 7 {
@@ -331,7 +330,7 @@ func TestOracle_CreateGetManyWithSorting(t *testing.T) {
 		}
 	}
 
-	sorting := map[string]string{"col_email": "desc"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetAll(nil, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else {
@@ -368,8 +367,8 @@ func TestOracle_CreateGetManyWithFilterAndSorting(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_email", Operator: "<", Value: "3@mydomain.com"}
-	sorting := map[string]string{"col_email": "desc"}
+	filter := &godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpLess, Value: "3@mydomain.com"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetAll(filter, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 3 {
@@ -408,7 +407,7 @@ func TestOracle_CreateGetManyWithSortingAndPaging(t *testing.T) {
 
 	fromOffset := 3
 	numRows := 4
-	sorting := map[string]string{"col_email": "desc"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != numRows {
@@ -512,7 +511,7 @@ func TestOracle_UpdateDuplicated(t *testing.T) {
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, err := dao.Update(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, err := dao.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }
@@ -648,7 +647,7 @@ func TestOracle_SaveExistingUnique(t *testing.T) {
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, _, err := dao.Save(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, _, err := dao.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }

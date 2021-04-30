@@ -321,7 +321,7 @@ func TestDynamodb_CreateExistingPK(t *testing.T) {
 
 	ubo.SetExtraAttr("email", "myname2@mydomain.com")
 	for _, dao := range []UniversalDao{dao1, dao2} {
-		if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+		if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 			t.Fatalf("%s failed: %s", name, err)
 		} else if ok {
 			t.Fatalf("%s failed: record should not be created twice", name)
@@ -359,7 +359,7 @@ func TestDynamodb_CreateExistingUnique(t *testing.T) {
 	} else if !ok {
 		t.Fatalf("%s failed: cannot create record", name)
 	}
-	if ok, err := dao2.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+	if ok, err := dao2.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 		// duplicated "email"
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
@@ -373,7 +373,7 @@ func TestDynamodb_CreateExistingUnique(t *testing.T) {
 	} else if !ok {
 		t.Fatalf("%s failed: cannot create record", name)
 	}
-	if ok, err := dao2.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+	if ok, err := dao2.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 		// duplicated {"subject","level"}
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
@@ -724,7 +724,7 @@ func TestDynamodb_UpdateDuplicated(t *testing.T) {
 	if _, err := dao1.Update(ubo1); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	}
-	if _, err := dao2.Update(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, err := dao2.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		// duplicated email
 		t.Fatalf("%s failed: %s", name, err)
 	}
@@ -734,7 +734,7 @@ func TestDynamodb_UpdateDuplicated(t *testing.T) {
 	if _, err := dao1.Update(ubo1); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	}
-	if _, err := dao2.Update(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, err := dao2.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		// duplicated {subject:level}
 		t.Fatalf("%s failed: %s", name, err)
 	}
@@ -914,7 +914,7 @@ func TestDynamodb_SaveExistingUnique(t *testing.T) {
 	} else if old == nil {
 		t.Fatalf("%s failed: there should be an existing record", name)
 	}
-	if _, _, err := dao2.Save(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, _, err := dao2.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		// duplicated email
 		t.Fatalf("%s failed: %s", name, err)
 	}
@@ -928,7 +928,7 @@ func TestDynamodb_SaveExistingUnique(t *testing.T) {
 	} else if old == nil {
 		t.Fatalf("%s failed: there should be an existing record", name)
 	}
-	if _, _, err := dao2.Save(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, _, err := dao2.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		// duplicated {subject:level}
 		t.Fatalf("%s failed: %s", name, err)
 	}

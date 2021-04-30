@@ -73,12 +73,12 @@ func TestDynamodbSingleTable_Create(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 }
 
@@ -118,7 +118,7 @@ func TestDynamodbSingleTable_CreateExistingPK(t *testing.T) {
 
 		ubo.SetExtraAttr("email", "myname2@mydomain.com")
 		for _, dao := range []UniversalDao{dao1, dao2} {
-			if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+			if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 				t.Fatalf("%s failed: %s", name, err)
 			} else if ok {
 				t.Fatalf("%s failed: record should not be created twice", name)
@@ -128,12 +128,12 @@ func TestDynamodbSingleTable_CreateExistingPK(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 }
 
@@ -177,7 +177,7 @@ func TestDynamodbSingleTable_CreateExistingUnique(t *testing.T) {
 		} else if !ok {
 			t.Fatalf("%s failed: cannot create record", name)
 		}
-		if ok, err := dao2.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+		if ok, err := dao2.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 			// duplicated "email"
 			t.Fatalf("%s failed: %s", name, err)
 		} else if ok {
@@ -191,7 +191,7 @@ func TestDynamodbSingleTable_CreateExistingUnique(t *testing.T) {
 		} else if !ok {
 			t.Fatalf("%s failed: cannot create record", name)
 		}
-		if ok, err := dao2.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+		if ok, err := dao2.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 			// duplicated {"subject","level"}
 			t.Fatalf("%s failed: %s", name, err)
 		} else if ok {
@@ -201,12 +201,12 @@ func TestDynamodbSingleTable_CreateExistingUnique(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*3 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*3, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*3, len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 }
 
@@ -287,12 +287,12 @@ func TestDynamodbSingleTable_CreateGet(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 }
 
@@ -410,12 +410,12 @@ func TestDynamodbSingleTable_CreateGetMany(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
 	}
 }
 
@@ -475,12 +475,12 @@ func TestDynamodbSingleTable_CreateGetManyWithFilter(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
 	}
 }
 
@@ -567,12 +567,12 @@ func TestDynamodbSingleTable_CreateGetManyWithPaging(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*10, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
 	}
 }
 
@@ -671,12 +671,12 @@ func TestDynamodbSingleTable_Update(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 }
 
@@ -767,7 +767,7 @@ func TestDynamodbSingleTable_UpdateDuplicated(t *testing.T) {
 		if _, err := dao1.Update(ubo1); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
 		}
-		if _, err := dao2.Update(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+		if _, err := dao2.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 			// duplicated email
 			t.Fatalf("%s failed: %s", name, err)
 		}
@@ -777,7 +777,7 @@ func TestDynamodbSingleTable_UpdateDuplicated(t *testing.T) {
 		if _, err := dao1.Update(ubo1); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
 		}
-		if _, err := dao2.Update(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+		if _, err := dao2.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 			// duplicated {subject:level}
 			t.Fatalf("%s failed: %s", name, err)
 		}
@@ -873,12 +873,12 @@ func TestDynamodbSingleTable_SaveNew(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 }
 
@@ -1011,12 +1011,12 @@ func TestDynamodbSingleTable_SaveExisting(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes) {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes), len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes), len(items))
 	}
 }
 
@@ -1065,7 +1065,7 @@ func TestDynamodbSingleTable_SaveExistingUnique(t *testing.T) {
 		} else if old == nil {
 			t.Fatalf("%s failed: there should be an existing record", name)
 		}
-		if _, _, err := dao2.Save(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+		if _, _, err := dao2.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 			// duplicated email
 			t.Fatalf("%s failed: %s", name, err)
 		}
@@ -1079,7 +1079,7 @@ func TestDynamodbSingleTable_SaveExistingUnique(t *testing.T) {
 		} else if old == nil {
 			t.Fatalf("%s failed: there should be an existing record", name)
 		}
-		if _, _, err := dao2.Save(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+		if _, _, err := dao2.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 			// duplicated {subject:level}
 			t.Fatalf("%s failed: %s", name, err)
 		}
@@ -1087,11 +1087,11 @@ func TestDynamodbSingleTable_SaveExistingUnique(t *testing.T) {
 	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*2 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*2, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*2, len(items))
 	}
 	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(items) != len(dynamodbSingleTableBoTypes)*2 {
-		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(cosmosdbSingleTableBoTypes)*2, len(items))
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*2, len(items))
 	}
 }

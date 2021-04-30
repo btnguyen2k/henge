@@ -14,7 +14,6 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	_ "github.com/btnguyen2k/gocosmos"
 	"github.com/btnguyen2k/godal"
-	"github.com/btnguyen2k/godal/sql"
 	"github.com/btnguyen2k/prom"
 )
 
@@ -73,9 +72,10 @@ func TestRowMapperCosmosdb_ToBo(t *testing.T) {
 
 func Test_CosmosdbFilterGeneratorSql(t *testing.T) {
 	name := "Test_CosmosdbFilterGeneratorSql"
+	var expected godal.FilterOpt
 
 	input := NewUniversalBo("myid", 1234)
-	expected := map[string]interface{}{CosmosdbColId: "myid"}
+	expected = &godal.FilterOptFieldOpValue{FieldName: CosmosdbColId, Operator: godal.FilterOpEqual, Value: "myid"}
 	if filter := cosmosdbFilterGeneratorSql("", input); !reflect.DeepEqual(filter, expected) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
 	}
@@ -85,13 +85,13 @@ func Test_CosmosdbFilterGeneratorSql(t *testing.T) {
 
 	input2 := godal.NewGenericBo()
 	input2.GboSetAttr(FieldId, "myid2")
-	expected = map[string]interface{}{CosmosdbColId: "myid2"}
+	expected = &godal.FilterOptFieldOpValue{FieldName: CosmosdbColId, Operator: godal.FilterOpEqual, Value: "myid2"}
 	if filter := cosmosdbFilterGeneratorSql("", input2); !reflect.DeepEqual(filter, expected) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
 	}
 
-	input3 := map[string]interface{}{"filter": "value"}
-	expected = map[string]interface{}{"filter": "value"}
+	input3 := godal.MakeFilter(map[string]interface{}{CosmosdbColId: "myid3"})
+	expected = &godal.FilterOptFieldOpValue{FieldName: CosmosdbColId, Operator: godal.FilterOpEqual, Value: "myid3"}
 	if filter := cosmosdbFilterGeneratorSql("", input3); !reflect.DeepEqual(filter, expected) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, expected, filter)
 	}
@@ -247,7 +247,7 @@ func TestCosmosdb_CreateExistingPK(t *testing.T) {
 	}
 
 	ubo.SetExtraAttr("email", "myname2@mydomain.com")
-	if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+	if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
 		t.Fatalf("%s failed: record should not be created twice", name)
@@ -274,7 +274,7 @@ func TestCosmosdb_CreateExistingUnique(t *testing.T) {
 	}
 
 	ubo.SetId("id2")
-	if ok, err := dao.Create(ubo); err != godal.GdaoErrorDuplicatedEntry {
+	if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if ok {
 		t.Fatalf("%s failed: record should not be created twice", name)
@@ -422,7 +422,7 @@ func TestCosmosdb_CreateGetManyWithFilter(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "age", Operator: ">=", Value: 35 + 3}
+	filter := &godal.FilterOptFieldOpValue{FieldName: "age", Operator: godal.FilterOpGreaterOrEqual, Value: 35 + 3}
 	if boList, err := dao.GetAll(filter, nil); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 7 {
@@ -457,7 +457,7 @@ func TestCosmosdb_CreateGetManyWithSorting(t *testing.T) {
 		}
 	}
 
-	sorting := map[string]string{"email": "desc"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetAll(nil, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else {
@@ -496,8 +496,8 @@ func TestCosmosdb_CreateGetManyWithFilterAndSorting(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "email", Operator: "<", Value: "3@mydomain.com"}
-	sorting := map[string]string{"email": "desc"}
+	filter := &godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpLess, Value: "3@mydomain.com"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetAll(filter, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 3 {
@@ -538,7 +538,7 @@ func TestCosmosdb_CreateGetManyWithSortingAndPaging(t *testing.T) {
 
 	fromOffset := 3
 	numRows := 4
-	sorting := map[string]string{"email": "desc"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != numRows {
@@ -649,7 +649,7 @@ func TestCosmosdb_UpdateDuplicated(t *testing.T) {
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, err := dao.Update(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, err := dao.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }
@@ -792,7 +792,7 @@ func TestCosmosdb_SaveExistingUnique(t *testing.T) {
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, _, err := dao.Save(ubo1); err != godal.GdaoErrorDuplicatedEntry {
+	if _, _, err := dao.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
 		t.Fatalf("%s failed: %s", name, err)
 	}
 }
