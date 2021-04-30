@@ -341,7 +341,7 @@ func TestMongo_CreateGetManyWithFilter(t *testing.T) {
 			t.Fatalf("%s failed: cannot create record", name)
 		}
 	}
-	
+
 	filter := &godal.FilterOptFieldOpValue{FieldName: "age", Operator: godal.FilterOpGreaterOrEqual, Value: 35 + 3}
 	if boList, err := dao.GetAll(filter, nil); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
