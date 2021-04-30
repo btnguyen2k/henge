@@ -616,10 +616,10 @@ type UniversalDao interface {
 	Get(id string) (*UniversalBo, error)
 
 	// GetN retrieves N business objects from storage.
-	GetN(fromOffset, maxNumRows int, filter interface{}, sorting interface{}) ([]*UniversalBo, error)
+	GetN(fromOffset, maxNumRows int, filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error)
 
 	// GetAll retrieves all available business objects from storage.
-	GetAll(filter interface{}, sorting interface{}) ([]*UniversalBo, error)
+	GetAll(filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error)
 
 	// Update modifies an existing business object.
 	// This function returns true if number of updated records is non-zero.

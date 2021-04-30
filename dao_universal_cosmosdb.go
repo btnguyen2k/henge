@@ -9,7 +9,6 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/cosmosdbsql"
-	"github.com/btnguyen2k/godal/sql"
 	"github.com/btnguyen2k/prom"
 )
 
@@ -70,6 +69,14 @@ func buildRowMapperCosmosdb() godal.IRowMapper {
 // rowMapperCosmosdb is an implementation of godal.IRowMapper specific for Azure Cosmos DB.
 type rowMapperCosmosdb struct {
 	wrap godal.IRowMapper
+}
+
+func (r *rowMapperCosmosdb) ToDbColName(_, fieldName string) string {
+	return fieldName
+}
+
+func (r *rowMapperCosmosdb) ToBoFieldName(_, colName string) string {
+	return colName
 }
 
 // ToRow implements godal.IRowMapper.ToRow.
@@ -159,25 +166,28 @@ func NewUniversalDaoCosmosdbSql(sqlc *prom.SqlConnect, tableName string, spec *C
 	dao.SetRowMapper(buildRowMapperCosmosdb())
 	dao.SetTxModeOnWrite(spec.TxModeOnWrite).SetSqlFlavor(sqlc.GetDbFlavor())
 	dao.funcFilterGeneratorSql = cosmosdbFilterGeneratorSql
-	dao.defaultSorting = (&sql.GenericSorting{Flavor: sqlc.GetDbFlavor()}).Add(CosmosdbColId)
+	dao.defaultSorting = (&godal.SortingField{FieldName: CosmosdbColId}).ToSortingOpt()
+
 	return dao
 }
 
 // cosmosdbFilterGeneratorSql is CosmosDB-implementation of FuncFilterGeneratorSql.
-func cosmosdbFilterGeneratorSql(_ string, input interface{}) interface{} {
+func cosmosdbFilterGeneratorSql(_ string, input interface{}) godal.FilterOpt {
 	switch input.(type) {
 	case UniversalBo:
 		bo := input.(UniversalBo)
-		return map[string]interface{}{CosmosdbColId: bo.id}
+		return godal.MakeFilter(map[string]interface{}{CosmosdbColId: bo.id})
 	case *UniversalBo:
 		bo := input.(*UniversalBo)
-		return map[string]interface{}{CosmosdbColId: bo.id}
+		return godal.MakeFilter(map[string]interface{}{CosmosdbColId: bo.id})
 	}
-	var gbo godal.IGenericBo
-	if gbo, _ = input.(godal.IGenericBo); gbo != nil {
-		return map[string]interface{}{CosmosdbColId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+	if gbo, ok := input.(godal.IGenericBo); ok && gbo != nil {
+		return godal.MakeFilter(map[string]interface{}{CosmosdbColId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)})
 	}
-	return input
+	if filter, ok := input.(godal.FilterOpt); ok {
+		return filter
+	}
+	return nil
 }
 
 // UniversalDaoCosmosdbSql is CosmosDB-based (using driver/sql interface) implementation of UniversalDao.
@@ -217,7 +227,7 @@ func (dao *UniversalDaoCosmosdbSql) Get(id string) (*UniversalBo, error) {
 	if dao.pkName != "" && dao.pkValue != "" {
 		filter[dao.pkName] = dao.pkValue
 	}
-	gbo, err := dao.GdaoFetchOne(dao.tableName, filter)
+	gbo, err := dao.GdaoFetchOne(dao.tableName, godal.MakeFilter(filter))
 	if err != nil {
 		return nil, err
 	}
@@ -225,24 +235,18 @@ func (dao *UniversalDaoCosmosdbSql) Get(id string) (*UniversalBo, error) {
 }
 
 // GetN implements UniversalDao.GetN.
-func (dao *UniversalDaoCosmosdbSql) GetN(fromOffset, maxNumRows int, filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoCosmosdbSql) GetN(fromOffset, maxNumRows int, filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	if sorting == nil {
 		sorting = dao.defaultSorting
 	}
 	if dao.pkName != "" && dao.pkValue != "" {
 		/* multi-tenant: add tenant filtering */
-		convertFilter, err := dao.BuildFilter(filter)
-		if err != nil {
-			return nil, err
+		tempFilter := &godal.FilterOptAnd{}
+		if filter != nil {
+			tempFilter.Add(filter)
 		}
-		opt := "="
-		if dao.GetOptionOpLiteral() != nil {
-			opt = dao.GetOptionOpLiteral().OpEqual
-		}
-		filter = &sql.FilterFieldValue{Field: dao.pkName, Operator: opt, Value: dao.pkValue}
-		if convertFilter != nil {
-			filter = (&sql.FilterAnd{}).Add(filter.(sql.IFilter)).Add(convertFilter)
-		}
+		tempFilter.Add(&godal.FilterOptFieldOpValue{FieldName: dao.pkName, Operator: godal.FilterOpEqual, Value: dao.pkValue})
+		filter = tempFilter
 	}
 	gboList, err := dao.GdaoFetchMany(dao.tableName, filter, sorting, fromOffset, maxNumRows)
 	if err != nil {
@@ -257,7 +261,7 @@ func (dao *UniversalDaoCosmosdbSql) GetN(fromOffset, maxNumRows int, filter inte
 }
 
 // GetAll implements UniversalDao.GetAll.
-func (dao *UniversalDaoCosmosdbSql) GetAll(filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoCosmosdbSql) GetAll(filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	return dao.GetN(0, 0, filter, sorting)
 }
 

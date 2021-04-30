@@ -27,6 +27,47 @@ const (
 	AwsDynamodbUidxTableColHash = "uhash"
 )
 
+// toFilterMap translates a godal.FilterOpt to DynamoDB-compatible filter map.
+func toFilterMap(filter godal.FilterOpt) (map[string]interface{}, error) {
+	if filter == nil {
+		return nil, nil
+	}
+	switch filter.(type) {
+	case godal.FilterOptFieldOpValue:
+		f := filter.(godal.FilterOptFieldOpValue)
+		return toFilterMap(&f)
+	case *godal.FilterOptFieldOpValue:
+		f := filter.(*godal.FilterOptFieldOpValue)
+		if f.Operator != godal.FilterOpEqual {
+			return nil, fmt.Errorf("invalid operator \"%#v\", only accept FilterOptFieldOpValue with operator FilterOpEqual", f.Operator)
+		}
+		return map[string]interface{}{f.FieldName: f.Value}, nil
+	case godal.FilterOptFieldIsNull:
+		f := filter.(godal.FilterOptFieldIsNull)
+		return toFilterMap(&f)
+	case *godal.FilterOptFieldIsNull:
+		f := filter.(*godal.FilterOptFieldIsNull)
+		return map[string]interface{}{f.FieldName: nil}, nil
+	case godal.FilterOptAnd:
+		f := filter.(godal.FilterOptAnd)
+		return toFilterMap(&f)
+	case *godal.FilterOptAnd:
+		f := filter.(*godal.FilterOptAnd)
+		result := make(map[string]interface{})
+		for _, inner := range f.Filters {
+			innerF, err := toFilterMap(inner)
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range innerF {
+				result[k] = v
+			}
+		}
+		return result, nil
+	}
+	return nil, fmt.Errorf("cannot build filter map from %T", filter)
+}
+
 // DynamodbTablesSpec holds specification of DynamoDB tables to be created.
 //
 // Available: since v0.3.2
@@ -108,6 +149,14 @@ func buildRowMapperDynamodb(tableName string, pkPrefix string) godal.IRowMapper 
 // rowMapperDynamodb is an implementation of godal.IRowMapper specific for AWS DynamoDB.
 type rowMapperDynamodb struct {
 	wrap godal.IRowMapper
+}
+
+func (r *rowMapperDynamodb) ToDbColName(tableName, fieldName string) string {
+	return fieldName
+}
+
+func (r *rowMapperDynamodb) ToBoFieldName(tableName, colName string) string {
+	return colName
 }
 
 // ToRow implements godal.IRowMapper.ToRow.
@@ -281,39 +330,21 @@ func (dao *UniversalDaoDynamodb) BuildUidxValues(bo godal.IGenericBo) map[string
 // If dao.pkPrefix is specified, this function creates filter on compound PK as { dao.pkPrefix, FieldId }. Otherwise, filter on single-attribute PK as { FieldId } is created.
 //
 // If dao.pkPrefix is specified, this function first fetches value of attribute dao.pkPrefix from BO. If the fetched value is empty, dao.pkPrefixValue is used.
-func (dao *UniversalDaoDynamodb) GdaoCreateFilter(_ string, bo godal.IGenericBo) interface{} {
-	filter := map[string]interface{}{FieldId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+func (dao *UniversalDaoDynamodb) GdaoCreateFilter(_ string, bo godal.IGenericBo) godal.FilterOpt {
+	filterMap := map[string]interface{}{FieldId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
 	if dao.pkPrefix != "" {
 		v := bo.GboGetAttrUnsafe(dao.pkPrefix, reddo.TypeString)
 		if v == nil || v == "" {
 			v = dao.pkPrefixValue
 		}
-		filter[dao.pkPrefix] = v
+		filterMap[dao.pkPrefix] = v
 	}
-	return filter
+	return godal.MakeFilter(filterMap)
 }
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoDynamodb) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
 	return NewUniversalBoFromGbo(gbo)
-	// if gbo == nil {
-	// 	return nil
-	// }
-	// extraFields := make(map[string]interface{})
-	// gbo.GboTransferViaJson(&extraFields)
-	// for _, field := range topLevelFieldList {
-	// 	delete(extraFields, field)
-	// }
-	// bo := &UniversalBo{
-	// 	id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
-	// 	dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
-	// 	checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
-	// 	timeCreated: gbo.GboGetAttrUnsafe(FieldTimeCreated, reddo.TypeTime).(time.Time),
-	// 	timeUpdated: gbo.GboGetAttrUnsafe(FieldTimeUpdated, reddo.TypeTime).(time.Time),
-	// 	tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
-	// 	_extraAttrs: extraFields,
-	// }
-	// return bo
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.
@@ -322,18 +353,6 @@ func (dao *UniversalDaoDynamodb) ToGenericBo(ubo *UniversalBo) godal.IGenericBo 
 		return nil
 	}
 	return ubo.ToGenericBo()
-	// ubo = ubo.Clone()
-	// gbo := godal.NewGenericBo()
-	// gbo.GboSetAttr(FieldId, ubo.id)
-	// gbo.GboSetAttr(FieldData, ubo.dataJson)
-	// gbo.GboSetAttr(FieldChecksum, ubo.checksum)
-	// gbo.GboSetAttr(FieldTimeCreated, ubo.timeCreated)
-	// gbo.GboSetAttr(FieldTimeUpdated, ubo.timeUpdated)
-	// gbo.GboSetAttr(FieldTagVersion, ubo.tagVersion)
-	// for k, v := range ubo._extraAttrs {
-	// 	gbo.GboSetAttr(k, v)
-	// }
-	// return gbo
 }
 
 // Delete implements UniversalDao.Delete.
@@ -349,9 +368,9 @@ func (dao *UniversalDaoDynamodb) Delete(bo *UniversalBo) (bool, error) {
 	if pkAttrs == nil || len(pkAttrs) == 0 {
 		return false, fmt.Errorf("cannot find PK attribute list for table [%s]", dao.tableName)
 	}
-	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
-	if !ok || keyFilter == nil {
-		return false, errors.New("cannot build filter to delete row")
+	keyFilter, err := toFilterMap(dao.GdaoCreateFilter(dao.tableName, gbo))
+	if err != nil {
+		return false, err
 	}
 	txItems := make([]*awsdynamodb.TransactWriteItem, 0)
 	adc := dao.GetAwsDynamodbConnect()
@@ -436,8 +455,8 @@ func (dao *UniversalDaoDynamodb) Create(bo *UniversalBo) (bool, error) {
 	_, err = adc.ExecTxWriteItems(nil, &awsdynamodb.TransactWriteItemsInput{TransactItems: txItems})
 	if awsErr, ok := err.(*awsdynamodb.TransactionCanceledException); ok {
 		for _, reason := range awsErr.CancellationReasons {
-			if *reason.Code == "ConditionalCheckFailed" {
-				return false, godal.GdaoErrorDuplicatedEntry
+			if *reason.Code == awsdynamodb.BatchStatementErrorCodeEnumConditionalCheckFailed {
+				return false, godal.ErrGdaoDuplicatedEntry
 			}
 		}
 	}
@@ -513,7 +532,7 @@ func toConditionBuilder(input interface{}) (*expression.ConditionBuilder, error)
 }
 
 // GetN implements UniversalDao.GetN.
-func (dao *UniversalDaoDynamodb) GetN(fromOffset, maxNumRows int, filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoDynamodb) GetN(fromOffset, maxNumRows int, filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	// TODO AWS DynamoDB does not currently support custom sorting
 
 	if dao.pkPrefix != "" && dao.pkPrefixValue != "" {
@@ -541,7 +560,7 @@ func (dao *UniversalDaoDynamodb) GetN(fromOffset, maxNumRows int, filter interfa
 }
 
 // GetAll implements UniversalDao.GetAll.
-func (dao *UniversalDaoDynamodb) GetAll(filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoDynamodb) GetAll(filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	return dao.GetN(0, 0, filter, sorting)
 }
 
@@ -567,9 +586,9 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 	if pkAttrs == nil || len(pkAttrs) == 0 {
 		return false, fmt.Errorf("cannot find PK attribute list for table [%s]", dao.tableName)
 	}
-	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
-	if !ok || keyFilter == nil {
-		return false, errors.New("cannot build filter to update row")
+	keyFilter, err := toFilterMap(dao.GdaoCreateFilter(dao.tableName, gbo))
+	if err != nil {
+		return false, err
 	}
 	row, err := dao.GetRowMapper().ToRow(dao.tableName, gbo)
 	if err != nil {
@@ -627,8 +646,8 @@ func (dao *UniversalDaoDynamodb) Update(bo *UniversalBo) (bool, error) {
 	_, err = adc.ExecTxWriteItems(nil, &awsdynamodb.TransactWriteItemsInput{TransactItems: txItems})
 	if awsErr, ok := err.(*awsdynamodb.TransactionCanceledException); ok {
 		for _, reason := range awsErr.CancellationReasons {
-			if *reason.Code == "ConditionalCheckFailed" {
-				return false, godal.GdaoErrorDuplicatedEntry
+			if *reason.Code == awsdynamodb.BatchStatementErrorCodeEnumConditionalCheckFailed {
+				return false, godal.ErrGdaoDuplicatedEntry
 			}
 		}
 	}
@@ -654,9 +673,9 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 	if pkAttrs == nil || len(pkAttrs) == 0 {
 		return false, existing, fmt.Errorf("cannot find PK attribute list for table [%s]", dao.tableName)
 	}
-	keyFilter, ok := dao.GdaoCreateFilter(dao.tableName, gbo).(map[string]interface{})
-	if !ok || keyFilter == nil {
-		return false, existing, errors.New("cannot build filter to save row")
+	keyFilter, err := toFilterMap(dao.GdaoCreateFilter(dao.tableName, gbo))
+	if err != nil {
+		return false, existing, err
 	}
 	row, err := dao.GetRowMapper().ToRow(dao.tableName, gbo)
 	if err != nil {
@@ -709,8 +728,8 @@ func (dao *UniversalDaoDynamodb) Save(bo *UniversalBo) (bool, *UniversalBo, erro
 	_, err = adc.ExecTxWriteItems(nil, &awsdynamodb.TransactWriteItemsInput{TransactItems: txItems})
 	if awsErr, ok := err.(*awsdynamodb.TransactionCanceledException); ok {
 		for _, reason := range awsErr.CancellationReasons {
-			if *reason.Code == "ConditionalCheckFailed" {
-				return false, existing, godal.GdaoErrorDuplicatedEntry
+			if *reason.Code == awsdynamodb.BatchStatementErrorCodeEnumConditionalCheckFailed {
+				return false, existing, godal.ErrGdaoDuplicatedEntry
 			}
 		}
 	}

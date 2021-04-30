@@ -12,7 +12,6 @@ import (
 
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
-	"github.com/btnguyen2k/godal/sql"
 	"github.com/btnguyen2k/prom"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -119,7 +118,7 @@ func TestSqlite_Create(t *testing.T) {
 }
 
 func _isErrorDuplicatedEntrySqlite(err error) bool {
-	if err == godal.GdaoErrorDuplicatedEntry {
+	if err == godal.ErrGdaoDuplicatedEntry {
 		return true
 	}
 	errStr := fmt.Sprintf("%e", err)
@@ -312,7 +311,7 @@ func TestSqlite_CreateGetManyWithFilter(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_age", Operator: ">=", Value: 35 + 3}
+	filter := &godal.FilterOptFieldOpValue{FieldName: "age", Operator: godal.FilterOpGreaterOrEqual, Value: 35 + 3}
 	if boList, err := dao.GetAll(filter, nil); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 7 {
@@ -345,7 +344,7 @@ func TestSqlite_CreateGetManyWithSorting(t *testing.T) {
 		}
 	}
 
-	sorting := map[string]string{"col_email": "desc"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetAll(nil, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else {
@@ -382,8 +381,8 @@ func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
 		}
 	}
 
-	filter := &sql.FilterFieldValue{Field: "col_email", Operator: "<", Value: "3@mydomain.com"}
-	sorting := map[string]string{"col_email": "desc"}
+	filter := &godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpLess, Value: "3@mydomain.com"}
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
 	if boList, err := dao.GetAll(filter, sorting); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if len(boList) != 3 {
@@ -395,9 +394,45 @@ func TestSqlite_CreateGetManyWithFilterAndSorting(t *testing.T) {
 	}
 }
 
-// currently godal does not support SQLite flavor!
 func TestSqlite_CreateGetManyWithSortingAndPaging(t *testing.T) {
-	// name := "TestSqlite_CreateGetManyWithSortingAndPaging"
+	name := "TestSqlite_CreateGetManyWithSortingAndPaging"
+	tblName := "table_temp"
+	sqlc, dao := _testSqliteInit(t, name, tblName)
+	defer sqlc.Close()
+
+	idList := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		idList = append(idList, strconv.Itoa(i))
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+	for i := 0; i < 10; i++ {
+		ubo := NewUniversalBo(idList[i], uint64(i))
+		ubo.SetDataAttr("name.first", strconv.Itoa(i))
+		ubo.SetDataAttr("name.last", "Nguyen")
+		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+		ubo.SetExtraAttr("age", 35+i)
+		if ok, err := dao.Create(ubo); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if !ok {
+			t.Fatalf("%s failed: cannot create record", name)
+		}
+	}
+
+	fromOffset := 3
+	numRows := 4
+	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
+	if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(boList) != numRows {
+		t.Fatalf("%s failed: expected %#v items but received %#v", name, numRows, len(boList))
+	} else {
+		for i := 0; i < numRows; i++ {
+			if boList[i].GetId() != strconv.Itoa(9-i-fromOffset) {
+				t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(9-i-fromOffset), boList[i].GetId())
+			}
+		}
+	}
 }
 
 func TestSqlite_Update(t *testing.T) {

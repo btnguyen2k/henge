@@ -57,7 +57,7 @@ func NewUniversalDaoSql(sqlc *prom.SqlConnect, tableName string, txModeOnWrite b
 	dao.SetRowMapper(buildRowMapperSql(tableName, extraColNameToFieldMappings))
 	dao.SetTxModeOnWrite(txModeOnWrite).SetSqlFlavor(sqlc.GetDbFlavor())
 	dao.funcFilterGeneratorSql = defaultFilterGeneratorSql
-	dao.defaultSorting = (&sql.GenericSorting{Flavor: sqlc.GetDbFlavor()}).Add(SqlColId)
+	dao.defaultSorting = (&godal.SortingField{FieldName: FieldId}).ToSortingOpt()
 	return dao
 }
 
@@ -98,23 +98,26 @@ var (
 
 // FuncFilterGeneratorSql defines an API to generate filter for universal BO, to be used with UniversalDaoSql.
 //
-// input can be either UniversalBo, *UniversalBo, godal.IGenericBo or an arbitrary filter instance.
+// input can be either UniversalBo, *UniversalBo, godal.IGenericBo or godal.FilterOpt instance.
 //
 // Available: since v0.3.0
-type FuncFilterGeneratorSql func(tableName string, input interface{}) interface{}
+type FuncFilterGeneratorSql func(tableName string, input interface{}) godal.FilterOpt
 
 // defaultFilterGeneratorSql is the default instance of FuncFilterGeneratorSql.
-func defaultFilterGeneratorSql(_ string, input interface{}) interface{} {
+func defaultFilterGeneratorSql(_ string, input interface{}) godal.FilterOpt {
 	switch input.(type) {
 	case UniversalBo:
 		bo := input.(UniversalBo)
-		return map[string]interface{}{SqlColId: bo.id}
+		return godal.MakeFilter(map[string]interface{}{FieldId: bo.id})
 	case *UniversalBo:
 		bo := input.(*UniversalBo)
-		return map[string]interface{}{SqlColId: bo.id}
+		return godal.MakeFilter(map[string]interface{}{FieldId: bo.id})
 	}
-	if gbo, ok := input.(godal.IGenericBo); ok {
-		return map[string]interface{}{SqlColId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)}
+	if gbo, ok := input.(godal.IGenericBo); ok && gbo != nil {
+		return godal.MakeFilter(map[string]interface{}{FieldId: gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString)})
+	}
+	if filter, ok := input.(godal.FilterOpt); ok {
+		return filter
 	}
 	return input
 }
@@ -124,11 +127,11 @@ type UniversalDaoSql struct {
 	sql.IGenericDaoSql
 	tableName              string
 	funcFilterGeneratorSql FuncFilterGeneratorSql
-	defaultSorting         sql.ISorting
+	defaultSorting         *godal.SortingOpt
 }
 
 // GdaoCreateFilter implements IGenericDao.GdaoCreateFilter.
-func (dao *UniversalDaoSql) GdaoCreateFilter(tableName string, bo godal.IGenericBo) interface{} {
+func (dao *UniversalDaoSql) GdaoCreateFilter(tableName string, bo godal.IGenericBo) godal.FilterOpt {
 	if dao.funcFilterGeneratorSql == nil {
 		dao.funcFilterGeneratorSql = defaultFilterGeneratorSql
 	}
@@ -162,7 +165,6 @@ func (dao *UniversalDaoSql) Create(bo *UniversalBo) (bool, error) {
 
 // Get implements UniversalDao.Get.
 func (dao *UniversalDaoSql) Get(id string) (*UniversalBo, error) {
-	// filterBo := NewUniversalBo(id, 0)
 	filterBo := &UniversalBo{id: id, _dirty: false}
 	filterGbo := dao.ToGenericBo(filterBo)
 	gbo, err := dao.GdaoFetchOne(dao.tableName, dao.GdaoCreateFilter(dao.tableName, filterGbo))
@@ -173,7 +175,7 @@ func (dao *UniversalDaoSql) Get(id string) (*UniversalBo, error) {
 }
 
 // GetN implements UniversalDao.GetN.
-func (dao *UniversalDaoSql) GetN(fromOffset, maxNumRows int, filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoSql) GetN(fromOffset, maxNumRows int, filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	if sorting == nil {
 		sorting = dao.defaultSorting
 	}
@@ -190,7 +192,7 @@ func (dao *UniversalDaoSql) GetN(fromOffset, maxNumRows int, filter interface{},
 }
 
 // GetAll implements UniversalDao.GetAll.
-func (dao *UniversalDaoSql) GetAll(filter interface{}, sorting interface{}) ([]*UniversalBo, error) {
+func (dao *UniversalDaoSql) GetAll(filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	return dao.GetN(0, 0, filter, sorting)
 }
 
