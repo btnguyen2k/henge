@@ -1,5 +1,10 @@
 # henge release notes
 
+## 2021-05-17 - v0.5.1
+
+- Fix `UniversalBo.Clone()`: call `_parseDataJson` before returning.
+
+
 ## 2021-04-30 - v0.5.0
 
 - Migrate to `btnguyen2k/godal v0.5.0`: implement `godal.SortingOpt` and `godal.FilterOpt`.

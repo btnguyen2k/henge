@@ -20,7 +20,7 @@ import (
 
 const (
 	// Version of package henge.
-	Version = "0.5.0"
+	Version = "0.5.1"
 )
 
 // clone a map, deep clone if possible.
@@ -582,7 +582,7 @@ func (ubo *UniversalBo) Clone() *UniversalBo {
 	ubo._lock.RLock()
 	defer ubo._lock.RUnlock()
 	ubo._sync()
-	return &UniversalBo{
+	clone := &UniversalBo{
 		id:          ubo.id,
 		dataJson:    ubo.dataJson,
 		tagVersion:  ubo.tagVersion,
@@ -594,6 +594,8 @@ func (ubo *UniversalBo) Clone() *UniversalBo {
 		_extraAttrs: cloneMap(ubo._extraAttrs),
 		_dirty:      false,
 	}
+	clone._parseDataJson(dataInitNone)
+	return clone
 }
 
 // UniversalDao defines API to access UniversalBo storage.
