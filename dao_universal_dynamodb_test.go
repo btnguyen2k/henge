@@ -12,7 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"github.com/btnguyen2k/consu/checksum"
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
@@ -77,14 +76,14 @@ func TestUniversalDaoDynamodb_pk(t *testing.T) {
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
 	dao := NewUniversalDaoDynamodb(adc, "tbl_test", &DynamodbDaoSpec{PkPrefix: "mypk", PkPrefixValue: "mypkvalue"})
-	dDao, ok := dao.(*UniversalDaoDynamodb)
-	if !ok || dDao == nil {
-		t.Fatalf("%s failed: nil", name)
-	}
-	if v := dDao.GetPkPrefix(); v != "mypk" {
+	// dDao, ok := dao.(*UniversalDaoDynamodb)
+	// if !ok || dDao == nil {
+	// 	t.Fatalf("%s failed: nil", name)
+	// }
+	if v := dao.GetPkPrefix(); v != "mypk" {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, v, "mypk")
 	}
-	if v := dDao.GetPkPrefixValue(); v != "mypkvalue" {
+	if v := dao.GetPkPrefixValue(); v != "mypkvalue" {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, v, "mypkvalue")
 	}
 }
@@ -198,10 +197,10 @@ func TestInitDynamodbTables(t *testing.T) {
 	}
 }
 
-func _testDynamodbInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName string, uidxIndexes [][]string) UniversalDao {
+func _testDynamodbInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName string, uidxIndexes [][]string) *UniversalDaoDynamodb {
 	if err := InitDynamodbTables(adc, tableName, &DynamodbTablesSpec{
 		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
-		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
+		CreateUidxTable: uidxIndexes != nil, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
 	}); err != nil {
 		t.Fatalf("%s failed: %s", testName, err)
 	}
@@ -214,7 +213,7 @@ func TestNewUniversalDaoDynamodb(t *testing.T) {
 	adc := _createAwsDynamodbConnect(t, name)
 	defer adc.Close()
 	tableName := "tbl_test"
-	dao := NewUniversalDaoDynamodb(adc, tableName, nil).(*UniversalDaoDynamodb)
+	dao := NewUniversalDaoDynamodb(adc, tableName, nil)
 	if dao.GetTableName() != tableName {
 		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableName, dao.GetTableName())
 	}
@@ -226,7 +225,7 @@ func TestNewUniversalDaoDynamodb(t *testing.T) {
 	}
 
 	uidxAttrs := [][]string{{"email"}, {"subject", "level"}}
-	dao = NewUniversalDaoDynamodb(adc, tableName, &DynamodbDaoSpec{UidxAttrs: uidxAttrs}).(*UniversalDaoDynamodb)
+	dao = NewUniversalDaoDynamodb(adc, tableName, &DynamodbDaoSpec{UidxAttrs: uidxAttrs})
 	if dao.GetTableName() != tableName {
 		t.Fatalf("%s failed: expected table name %#v but received %#v", name, tableName, dao.GetTableName())
 	}
@@ -248,7 +247,7 @@ func TestUniversalDaoDynamodb_SetGetUidxHashFunctions(t *testing.T) {
 	defer adc.Close()
 
 	tableName := "tbl_test"
-	dao := NewUniversalDaoDynamodb(adc, tableName, nil).(*UniversalDaoDynamodb)
+	dao := NewUniversalDaoDynamodb(adc, tableName, nil)
 	if hfList := dao.GetUidxHashFunctions(); len(hfList) != 2 || hfList[0] == nil || hfList[1] == nil {
 		t.Fatalf("%s failed", name)
 	}
@@ -539,7 +538,7 @@ func TestDynamodb_CreateGetManyWithFilter(t *testing.T) {
 			}
 		}
 
-		filter := expression.Name("age").GreaterThanEqual(expression.Value(35 + 3))
+		filter := &godal.FilterOptFieldOpValue{FieldName: "age", Operator: godal.FilterOpGreaterOrEqual, Value: 35 + 3}
 		if boList, err := dao.GetAll(filter, nil); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
 		} else if len(boList) != 7 {
@@ -550,17 +549,236 @@ func TestDynamodb_CreateGetManyWithFilter(t *testing.T) {
 
 // AWS Dynamodb does not support custom sorting yet
 func TestDynamodb_CreateGetManyWithSorting(t *testing.T) {
-	// name := "TestDynamodb_CreateGetManyWithSorting"
+	name := "TestDynamodb_CreateGetManyWithSorting"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
+
+	gsiPlaceholderPartitionField := "__dummy"
+	gsiFieldValue := "*"
+	gsiFilter := &godal.FilterOptFieldOpValue{FieldName: gsiPlaceholderPartitionField, Operator: godal.FilterOpEqual, Value: gsiFieldValue}
+	attrsDef := []prom.AwsDynamodbNameAndType{{Name: gsiPlaceholderPartitionField, Type: prom.AwsAttrTypeString}, {Name: "email", Type: prom.AwsAttrTypeString}}
+	keyAttrs := []prom.AwsDynamodbNameAndType{{Name: gsiPlaceholderPartitionField, Type: prom.AwsKeyTypePartition}, {Name: "email", Type: prom.AwsKeyTypeSort}}
+	gsiName := "gsi_email"
+	sortField := "email"
+	if err := adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableNoUidx, gsiName, 1, 1, attrsDef, keyAttrs); err != nil {
+		t.Fatalf("%s failed: %s", name+"/GSI:"+awsDynamodbTableNoUidx, err)
+	}
+	dao1.MapGsi(gsiName, sortField)
+	if err := adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableUidx, gsiName, 1, 1, attrsDef, keyAttrs); err != nil {
+		t.Fatalf("%s failed: %s", name+"/GSI:"+awsDynamodbTableUidx, err)
+	}
+	dao2.MapGsi(gsiName, sortField)
+
+	idList := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		idList = append(idList, strconv.Itoa(i))
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+	for _, dao := range []UniversalDao{dao1, dao2} {
+		for i := 0; i < 10; i++ {
+			ubo := NewUniversalBo(idList[i], uint64(i))
+			ubo.SetDataAttr("name.first", strconv.Itoa(i))
+			ubo.SetDataAttr("name.last", "Nguyen")
+			ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+			ubo.SetExtraAttr("subject", "English").SetExtraAttr("level", idList[i])
+			ubo.SetExtraAttr("age", 35+i)
+			ubo.SetExtraAttr(gsiPlaceholderPartitionField, gsiFieldValue)
+			if ok, err := dao.Create(ubo); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if !ok {
+				t.Fatalf("%s failed: cannot create record", name)
+			}
+		}
+
+		filter := gsiFilter
+		sorting := (&godal.SortingField{FieldName: sortField}).ToSortingOpt()
+		if boList, err := dao.GetAll(filter, sorting); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if len(boList) != len(idList) {
+			t.Fatalf("%s failed: expected %d items but received %d", name, len(idList), len(boList))
+		} else {
+			for i := 0; i < 10; i++ {
+				if boList[i].GetId() != strconv.Itoa(i) {
+					t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(i), boList[i].GetId())
+				}
+			}
+		}
+
+		sorting = (&godal.SortingField{FieldName: sortField, Descending: true}).ToSortingOpt()
+		if boList, err := dao.GetAll(filter, sorting); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if len(boList) != len(idList) {
+			t.Fatalf("%s failed: expected %d items but received %d", name, len(idList), len(boList))
+		} else {
+			for i := 0; i < 10; i++ {
+				if boList[i].GetId() != strconv.Itoa(10-i-1) {
+					t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(10-i-1), boList[i].GetId())
+				}
+			}
+		}
+	}
 }
 
 // AWS Dynamodb does not support custom sorting yet
 func TestDynamodb_CreateGetManyWithFilterAndSorting(t *testing.T) {
-	// name := "TestDynamodb_CreateGetManyWithFilterAndSorting"
+	name := "TestDynamodb_CreateGetManyWithFilterAndSorting"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
+
+	gsiPlaceholderPartitionField := "__dummy"
+	gsiFieldValue := "*"
+	gsiFilter := &godal.FilterOptFieldOpValue{FieldName: gsiPlaceholderPartitionField, Operator: godal.FilterOpEqual, Value: gsiFieldValue}
+	attrsDef := []prom.AwsDynamodbNameAndType{{Name: gsiPlaceholderPartitionField, Type: prom.AwsAttrTypeString}, {Name: "email", Type: prom.AwsAttrTypeString}}
+	keyAttrs := []prom.AwsDynamodbNameAndType{{Name: gsiPlaceholderPartitionField, Type: prom.AwsKeyTypePartition}, {Name: "email", Type: prom.AwsKeyTypeSort}}
+	gsiName := "gsi_email"
+	sortField := "email"
+	if err := adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableNoUidx, gsiName, 1, 1, attrsDef, keyAttrs); err != nil {
+		t.Fatalf("%s failed: %s", name+"/GSI:"+awsDynamodbTableNoUidx, err)
+	}
+	dao1.MapGsi(gsiName, sortField)
+	if err := adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableUidx, gsiName, 1, 1, attrsDef, keyAttrs); err != nil {
+		t.Fatalf("%s failed: %s", name+"/GSI:"+awsDynamodbTableUidx, err)
+	}
+	dao2.MapGsi(gsiName, sortField)
+
+	idList := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		idList = append(idList, strconv.Itoa(i))
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+	for _, dao := range []UniversalDao{dao1, dao2} {
+		for i := 0; i < 10; i++ {
+			ubo := NewUniversalBo(idList[i], uint64(i))
+			ubo.SetDataAttr("name.first", strconv.Itoa(i))
+			ubo.SetDataAttr("name.last", "Nguyen")
+			ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+			ubo.SetExtraAttr("subject", "English").SetExtraAttr("level", idList[i])
+			ubo.SetExtraAttr("age", 35+i)
+			ubo.SetExtraAttr(gsiPlaceholderPartitionField, gsiFieldValue)
+			if ok, err := dao.Create(ubo); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if !ok {
+				t.Fatalf("%s failed: cannot create record", name)
+			}
+		}
+
+		sorting := (&godal.SortingField{FieldName: sortField}).ToSortingOpt()
+		filter := (&godal.FilterOptAnd{}).Add(gsiFilter).
+			Add(&godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpLess, Value: "3@mydomain.com"})
+		if boList, err := dao.GetAll(filter, sorting); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if len(boList) != 3 {
+			t.Fatalf("%s failed: expected %#v items but received %#v", name, 3, len(boList))
+		} else {
+			if boList[0].GetId() != "0" || boList[1].GetId() != "1" || boList[2].GetId() != "2" {
+				t.Fatalf("%s failed", name)
+			}
+		}
+
+		sorting = (&godal.SortingField{FieldName: sortField, Descending: true}).ToSortingOpt()
+		filter = (&godal.FilterOptAnd{}).Add(gsiFilter).
+			Add(&godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpLess, Value: "3@mydomain.com"})
+		if boList, err := dao.GetAll(filter, sorting); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if len(boList) != 3 {
+			t.Fatalf("%s failed: expected %#v items but received %#v", name, 3, len(boList))
+		} else {
+			if boList[0].GetId() != "2" || boList[1].GetId() != "1" || boList[2].GetId() != "0" {
+				t.Fatalf("%s failed", name)
+			}
+		}
+	}
 }
 
 // AWS Dynamodb does not support custom sorting yet
 func TestDynamodb_CreateGetManyWithSortingAndPaging(t *testing.T) {
-	// 	name := "TestDynamodb_CreateGetManyWithSortingAndPaging"
+	name := "TestDynamodb_CreateGetManyWithSortingAndPaging"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
+	dao1 := _testDynamodbInit(t, name, adc, awsDynamodbTableNoUidx, nil)
+	dao2 := _testDynamodbInit(t, name, adc, awsDynamodbTableUidx, [][]string{{"email"}, {"subject", "level"}})
+
+	gsiPlaceholderPartitionField := "__dummy"
+	gsiFieldValue := "*"
+	gsiFilter := &godal.FilterOptFieldOpValue{FieldName: gsiPlaceholderPartitionField, Operator: godal.FilterOpEqual, Value: gsiFieldValue}
+	attrsDef := []prom.AwsDynamodbNameAndType{{Name: gsiPlaceholderPartitionField, Type: prom.AwsAttrTypeString}, {Name: "email", Type: prom.AwsAttrTypeString}}
+	keyAttrs := []prom.AwsDynamodbNameAndType{{Name: gsiPlaceholderPartitionField, Type: prom.AwsKeyTypePartition}, {Name: "email", Type: prom.AwsKeyTypeSort}}
+	gsiName := "gsi_email"
+	sortField := "email"
+	if err := adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableNoUidx, gsiName, 1, 1, attrsDef, keyAttrs); err != nil {
+		t.Fatalf("%s failed: %s", name+"/GSI:"+awsDynamodbTableNoUidx, err)
+	}
+	dao1.MapGsi(gsiName, sortField)
+	if err := adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableUidx, gsiName, 1, 1, attrsDef, keyAttrs); err != nil {
+		t.Fatalf("%s failed: %s", name+"/GSI:"+awsDynamodbTableUidx, err)
+	}
+	dao2.MapGsi(gsiName, sortField)
+
+	idList := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		idList = append(idList, strconv.Itoa(i))
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+
+	for _, dao := range []UniversalDao{dao1, dao2} {
+		for i := 0; i < 10; i++ {
+			ubo := NewUniversalBo(idList[i], uint64(i))
+			ubo.SetDataAttr("name.first", strconv.Itoa(i))
+			ubo.SetDataAttr("name.last", "Nguyen")
+			ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+			ubo.SetExtraAttr("subject", "English").SetExtraAttr("level", idList[i])
+			ubo.SetExtraAttr("age", 35+i)
+			ubo.SetExtraAttr(gsiPlaceholderPartitionField, gsiFieldValue)
+			if ok, err := dao.Create(ubo); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if !ok {
+				t.Fatalf("%s failed: cannot create record", name)
+			}
+		}
+
+		fromOffset := 3
+		numRows := 4
+		filter := gsiFilter
+
+		sorting := (&godal.SortingField{FieldName: sortField}).ToSortingOpt()
+		if boList, err := dao.GetN(fromOffset, numRows, filter, sorting); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if len(boList) != numRows {
+			t.Fatalf("%s failed: expected %d items but received %d", name, numRows, len(boList))
+		} else {
+			for i := 0; i < numRows; i++ {
+				if boList[i].GetId() != strconv.Itoa(fromOffset+i) {
+					t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(fromOffset+i), boList[i].GetId())
+				}
+			}
+		}
+
+		sorting = (&godal.SortingField{FieldName: sortField, Descending: true}).ToSortingOpt()
+		if boList, err := dao.GetN(fromOffset, numRows, filter, sorting); err != nil {
+			t.Fatalf("%s failed: %s", name, err)
+		} else if len(boList) != numRows {
+			t.Fatalf("%s failed: expected %#v items but received %#v", name, numRows, len(boList))
+		} else {
+			for i := 0; i < numRows; i++ {
+				if boList[i].GetId() != strconv.Itoa(9-i-fromOffset) {
+					t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(9-i-fromOffset), boList[i].GetId())
+				}
+			}
+		}
+	}
 }
 
 func TestDynamodb_CreateGetManyWithPaging(t *testing.T) {
