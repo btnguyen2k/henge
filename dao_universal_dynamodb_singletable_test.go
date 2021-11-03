@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/prom"
@@ -20,7 +19,7 @@ var (
 	dynamodbSingleTableBoTypes = []string{"users", "products", "none"}
 )
 
-func _testDynamodbSingleTableInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName, pkPrefix, pkPrefixValue string, uidxIndexes [][]string) UniversalDao {
+func _testDynamodbSingleTableInit(t *testing.T, testName string, adc *prom.AwsDynamodbConnect, tableName, pkPrefix, pkPrefixValue string, uidxIndexes [][]string) *UniversalDaoDynamodb {
 	spec := &DynamodbTablesSpec{
 		MainTableRcu: awsDynamodbRCU, MainTableWcu: awsDynamodbWCU,
 		CreateUidxTable: true, UidxTableRcu: awsDynamodbRCU, UidxTableWcu: awsDynamodbWCU,
@@ -459,11 +458,11 @@ func TestDynamodbSingleTable_CreateGetManyWithFilter(t *testing.T) {
 				}
 			}
 
-			filter := expression.Name("email").GreaterThanEqual(expression.Value("3@mydomain.com"))
+			filter := &godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpGreaterOrEqual, Value: "3@mydomain.com"}
 			if boType == "users" {
-				filter = expression.Name("age").GreaterThanEqual(expression.Value(35 + 3))
+				filter.FieldName, filter.Value = "age", 35+3
 			} else if boType == "products" {
-				filter = expression.Name("stock").GreaterThanEqual(expression.Value(35 + 3))
+				filter.FieldName, filter.Value = "stock", 35+3
 			}
 			if boList, err := dao.GetAll(filter, nil); err != nil {
 				t.Fatalf("%s failed: %s", name, err)
@@ -486,17 +485,275 @@ func TestDynamodbSingleTable_CreateGetManyWithFilter(t *testing.T) {
 
 // AWS Dynamodb does not support custom sorting yet
 func TestDynamodbSingleTable_CreateGetManyWithSorting(t *testing.T) {
-	// name := "TestDynamodbSingleTable_CreateGetManyWithSorting"
+	name := "TestDynamodbSingleTable_CreateGetMany"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
+
+	for _, boType := range dynamodbSingleTableBoTypes {
+		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
+		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
+			[][]string{{dynamodbSingleTablePkPrefix, "email"}, {dynamodbSingleTablePkPrefix, "subject", "level"}})
+
+		gsiName := "gsi_email"
+		sortField := "email"
+		attrsDef := []prom.AwsDynamodbNameAndType{{Name: dynamodbSingleTablePkPrefix, Type: prom.AwsAttrTypeString}, {Name: sortField, Type: prom.AwsAttrTypeString}}
+		keyAttrs := []prom.AwsDynamodbNameAndType{
+			{Name: dynamodbSingleTablePkPrefix, Type: prom.AwsKeyTypePartition}, {Name: sortField, Type: prom.AwsKeyTypeSort}}
+		adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableNoUidx, gsiName, 1, 1, attrsDef, keyAttrs)
+		adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableUidx, gsiName, 1, 1, attrsDef, keyAttrs)
+
+		dao1.MapGsi(gsiName, sortField)
+		dao2.MapGsi(gsiName, sortField)
+
+		idList := make([]string, 0)
+		for i := 0; i < 10; i++ {
+			idList = append(idList, strconv.Itoa(i))
+		}
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+		for _, dao := range []UniversalDao{dao1, dao2} {
+			for i := 0; i < 10; i++ {
+				ubo := NewUniversalBo(idList[i], uint64(i))
+				ubo.SetExtraAttr(dynamodbSingleTablePkPrefix, boType)
+				ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+				ubo.SetExtraAttr("subject", "English").SetExtraAttr("level", idList[i])
+				if boType == "users" {
+					ubo.SetDataAttr("name.first", strconv.Itoa(i))
+					ubo.SetDataAttr("name.last", "Nguyen")
+					ubo.SetExtraAttr("age", 35+i)
+				} else if boType == "products" {
+					ubo.SetDataAttr("name.en", strconv.Itoa(i)+" (EN)")
+					ubo.SetDataAttr("name.vi", strconv.Itoa(i)+" (VI)")
+					ubo.SetExtraAttr("stock", 35+i)
+				}
+				if ok, err := dao.Create(ubo); err != nil {
+					t.Fatalf("%s failed: %s", name, err)
+				} else if !ok {
+					t.Fatalf("%s failed: cannot create record", name)
+				}
+			}
+
+			sorting := (&godal.SortingField{FieldName: sortField}).ToSortingOpt()
+			if boList, err := dao.GetAll(nil, sorting); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if len(boList) != len(idList) {
+				t.Fatalf("%s failed: expected %d items but received %d", name, len(idList), len(boList))
+			} else {
+				for i := 0; i < 10; i++ {
+					if boList[i].GetId() != strconv.Itoa(i) {
+						t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(i), boList[i].GetId())
+					}
+				}
+			}
+
+			sorting = (&godal.SortingField{FieldName: sortField, Descending: true}).ToSortingOpt()
+			if boList, err := dao.GetAll(nil, sorting); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if len(boList) != len(idList) {
+				t.Fatalf("%s failed: expected %d items but received %d", name, len(idList), len(boList))
+			} else {
+				for i := 0; i < 10; i++ {
+					if boList[i].GetId() != strconv.Itoa(10-i-1) {
+						t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(10-i-1), boList[i].GetId())
+					}
+				}
+			}
+		}
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
+	}
 }
 
 // AWS Dynamodb does not support custom sorting yet
 func TestDynamodbSingleTable_CreateGetManyWithFilterAndSorting(t *testing.T) {
-	// name := "TestDynamodbSingleTable_CreateGetManyWithFilterAndSorting"
+	name := "TestDynamodbSingleTable_CreateGetManyWithFilterAndSorting"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
+
+	for _, boType := range dynamodbSingleTableBoTypes {
+		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
+		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
+			[][]string{{dynamodbSingleTablePkPrefix, "email"}, {dynamodbSingleTablePkPrefix, "subject", "level"}})
+
+		gsiName := "gsi_email"
+		sortField := "email"
+		attrsDef := []prom.AwsDynamodbNameAndType{{Name: dynamodbSingleTablePkPrefix, Type: prom.AwsAttrTypeString}, {Name: sortField, Type: prom.AwsAttrTypeString}}
+		keyAttrs := []prom.AwsDynamodbNameAndType{
+			{Name: dynamodbSingleTablePkPrefix, Type: prom.AwsKeyTypePartition}, {Name: sortField, Type: prom.AwsKeyTypeSort}}
+		adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableNoUidx, gsiName, 1, 1, attrsDef, keyAttrs)
+		adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableUidx, gsiName, 1, 1, attrsDef, keyAttrs)
+
+		dao1.MapGsi(gsiName, sortField)
+		dao2.MapGsi(gsiName, sortField)
+
+		idList := make([]string, 0)
+		for i := 0; i < 10; i++ {
+			idList = append(idList, strconv.Itoa(i))
+		}
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+		for _, dao := range []UniversalDao{dao1, dao2} {
+			for i := 0; i < 10; i++ {
+				ubo := NewUniversalBo(idList[i], uint64(i))
+				ubo.SetExtraAttr(dynamodbSingleTablePkPrefix, boType)
+				ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+				ubo.SetExtraAttr("subject", "English").SetExtraAttr("level", idList[i])
+				if boType == "users" {
+					ubo.SetDataAttr("name.first", strconv.Itoa(i))
+					ubo.SetDataAttr("name.last", "Nguyen")
+					ubo.SetExtraAttr("age", 35+i)
+				} else if boType == "products" {
+					ubo.SetDataAttr("name.en", strconv.Itoa(i)+" (EN)")
+					ubo.SetDataAttr("name.vi", strconv.Itoa(i)+" (VI)")
+					ubo.SetExtraAttr("stock", 35+i)
+				}
+				if ok, err := dao.Create(ubo); err != nil {
+					t.Fatalf("%s failed: %s", name, err)
+				} else if !ok {
+					t.Fatalf("%s failed: cannot create record", name)
+				}
+			}
+
+			filter := &godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpLess, Value: "3@mydomain.com"}
+			sorting := (&godal.SortingField{FieldName: sortField}).ToSortingOpt()
+			if boList, err := dao.GetAll(filter, sorting); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if len(boList) != 3 {
+				t.Fatalf("%s failed: expected %#v items but received %#v", name, 3, len(boList))
+			} else {
+				if boList[0].GetId() != "0" || boList[1].GetId() != "1" || boList[2].GetId() != "2" {
+					t.Fatalf("%s failed", name)
+				}
+			}
+
+			sorting = (&godal.SortingField{FieldName: sortField, Descending: true}).ToSortingOpt()
+			if boList, err := dao.GetAll(filter, sorting); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if len(boList) != 3 {
+				t.Fatalf("%s failed: expected %#v items but received %#v", name, 3, len(boList))
+			} else {
+				if boList[0].GetId() != "2" || boList[1].GetId() != "1" || boList[2].GetId() != "0" {
+					t.Fatalf("%s failed", name)
+				}
+			}
+		}
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
+	}
 }
 
 // AWS Dynamodb does not support custom sorting yet
 func TestDynamodbSingleTable_CreateGetManyWithSortingAndPaging(t *testing.T) {
-	// 	name := "TestDynamodbSingleTable_CreateGetManyWithSortingAndPaging"
+	name := "TestDynamodbSingleTable_CreateGetManyWithSortingAndPaging"
+	adc := _createAwsDynamodbConnect(t, name)
+	defer adc.Close()
+	_cleanupDynamodb(adc, awsDynamodbTableNoUidx)
+	_cleanupDynamodb(adc, awsDynamodbTableUidx)
+
+	for _, boType := range dynamodbSingleTableBoTypes {
+		dao1 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableNoUidx, dynamodbSingleTablePkPrefix, boType, nil)
+		dao2 := _testDynamodbSingleTableInit(t, name, adc, awsDynamodbTableUidx, dynamodbSingleTablePkPrefix, boType,
+			[][]string{{dynamodbSingleTablePkPrefix, "email"}, {dynamodbSingleTablePkPrefix, "subject", "level"}})
+
+		gsiName := "gsi_email"
+		sortField := "email"
+		attrsDef := []prom.AwsDynamodbNameAndType{{Name: dynamodbSingleTablePkPrefix, Type: prom.AwsAttrTypeString}, {Name: sortField, Type: prom.AwsAttrTypeString}}
+		keyAttrs := []prom.AwsDynamodbNameAndType{
+			{Name: dynamodbSingleTablePkPrefix, Type: prom.AwsKeyTypePartition}, {Name: sortField, Type: prom.AwsKeyTypeSort}}
+		adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableNoUidx, gsiName, 1, 1, attrsDef, keyAttrs)
+		adc.CreateGlobalSecondaryIndex(nil, awsDynamodbTableUidx, gsiName, 1, 1, attrsDef, keyAttrs)
+
+		dao1.MapGsi(gsiName, sortField)
+		dao2.MapGsi(gsiName, sortField)
+
+		idList := make([]string, 0)
+		for i := 0; i < 10; i++ {
+			idList = append(idList, strconv.Itoa(i))
+		}
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
+		for _, dao := range []UniversalDao{dao1, dao2} {
+			for i := 0; i < 10; i++ {
+				ubo := NewUniversalBo(idList[i], uint64(i))
+				ubo.SetExtraAttr(dynamodbSingleTablePkPrefix, boType)
+				ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
+				ubo.SetExtraAttr("subject", "English").SetExtraAttr("level", idList[i])
+				if boType == "users" {
+					ubo.SetDataAttr("name.first", strconv.Itoa(i))
+					ubo.SetDataAttr("name.last", "Nguyen")
+					ubo.SetExtraAttr("age", 35+i)
+				} else if boType == "products" {
+					ubo.SetDataAttr("name.en", strconv.Itoa(i)+" (EN)")
+					ubo.SetDataAttr("name.vi", strconv.Itoa(i)+" (VI)")
+					ubo.SetExtraAttr("stock", 35+i)
+				}
+				if ok, err := dao.Create(ubo); err != nil {
+					t.Fatalf("%s failed: %s", name, err)
+				} else if !ok {
+					t.Fatalf("%s failed: cannot create record", name)
+				}
+			}
+
+			fromOffset := 3
+			numRows := 4
+
+			sorting := (&godal.SortingField{FieldName: sortField}).ToSortingOpt()
+			if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if len(boList) != numRows {
+				t.Fatalf("%s failed: expected %d items but received %d", name, numRows, len(boList))
+			} else {
+				for i := 0; i < numRows; i++ {
+					if boList[i].GetId() != strconv.Itoa(fromOffset+i) {
+						t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(fromOffset+i), boList[i].GetId())
+					}
+				}
+			}
+
+			sorting = (&godal.SortingField{FieldName: sortField, Descending: true}).ToSortingOpt()
+			if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
+				t.Fatalf("%s failed: %s", name, err)
+			} else if len(boList) != numRows {
+				t.Fatalf("%s failed: expected %#v items but received %#v", name, numRows, len(boList))
+			} else {
+				for i := 0; i < numRows; i++ {
+					if boList[i].GetId() != strconv.Itoa(9-i-fromOffset) {
+						t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(9-i-fromOffset), boList[i].GetId())
+					}
+				}
+			}
+		}
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableNoUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
+	}
+	if items, err := adc.ScanItems(nil, awsDynamodbTableUidx, nil, ""); err != nil {
+		t.Fatalf("%s failed: %s", name, err)
+	} else if len(items) != len(dynamodbSingleTableBoTypes)*10 {
+		t.Fatalf("%s failed: expected table to have %#v rows but received %#v", name, len(dynamodbSingleTableBoTypes)*10, len(items))
+	}
 }
 
 // one single DynamoDB table should be able to store multiple types of BO.
@@ -541,11 +798,11 @@ func TestDynamodbSingleTable_CreateGetManyWithPaging(t *testing.T) {
 
 			fromOffset := 3
 			numRows := 4
-			filter := expression.Name("email").GreaterThanEqual(expression.Value("3@mydomain.com"))
+			filter := &godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpGreaterOrEqual, Value: "3@mydomain.com"}
 			if boType == "users" {
-				filter = expression.Name("age").GreaterThanEqual(expression.Value(35 + 3))
+				filter.FieldName, filter.Value = "age", 35+3
 			} else if boType == "products" {
-				filter = expression.Name("stock").GreaterThanEqual(expression.Value(35 + 3))
+				filter.FieldName, filter.Value = "stock", 35+3
 			}
 			if boList, err := dao.GetN(fromOffset, numRows, filter, nil); err != nil {
 				t.Fatalf("%s failed: %s", name, err)

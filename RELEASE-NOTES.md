@@ -1,5 +1,12 @@
 # henge release notes
 
+## 2021-11-03 - v0.5.2
+
+- Migrated to `prom v0.2.15`, `UniversalDaoDynamodb` now supports basic sorting (via GSI).
+- Update dependencies.
+- Other fixes and enhancements.
+
+
 ## 2021-05-17 - v0.5.1
 
 - Fix `UniversalBo.Clone()`: call `_parseDataJson` before returning.

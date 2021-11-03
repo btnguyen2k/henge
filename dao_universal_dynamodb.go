@@ -208,18 +208,19 @@ type DynamodbDaoSpec struct {
 //   - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
 //   - the table has default pk as { FieldId }. If pkPrefix is supplied, table pk becomes { pkPrefix, FieldId }.
 //   - static value for pkPrefix attribute can be specified via pkPrefixValue.
-func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, spec *DynamodbDaoSpec) UniversalDao {
+func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, spec *DynamodbDaoSpec) *UniversalDaoDynamodb {
 	if spec == nil {
 		spec = &DynamodbDaoSpec{}
 	}
 	dao := &UniversalDaoDynamodb{
-		tableName:     tableName,
-		pkPrefix:      spec.PkPrefix,
-		pkPrefixValue: spec.PkPrefixValue,
-		uidxTableName: tableName + AwsDynamodbUidxTableSuffix,
-		uidxAttrs:     spec.UidxAttrs,
-		uidxHf1:       checksum.Sha1HashFunc,
-		uidxHf2:       checksum.Md5HashFunc,
+		tableName:      tableName,
+		pkPrefix:       spec.PkPrefix,
+		pkPrefixValue:  spec.PkPrefixValue,
+		uidxTableName:  tableName + AwsDynamodbUidxTableSuffix,
+		uidxAttrs:      spec.UidxAttrs,
+		uidxHf1:        checksum.Sha1HashFunc,
+		uidxHf2:        checksum.Md5HashFunc,
+		gsiSortMapping: make(map[string]string),
 	}
 	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
 	dao.SetRowMapper(buildRowMapperDynamodb(tableName, spec.PkPrefix))
@@ -235,6 +236,23 @@ type UniversalDaoDynamodb struct {
 	uidxTableName    string            // name of database table to store unique indexes
 	uidxAttrs        [][]string        // list of unique indexes (each unique index is a combination of table columns)
 	uidxHf1, uidxHf2 checksum.HashFunc // hash functions used to calculate unique index hash
+	gsiSortMapping   map[string]string // (since v0.5.2) mapping {fieldName->gsiName}, used to lookup GSI if sorting is specified
+}
+
+// MapGsi associates a list of table fields (in order) with a GSI. The mappings are to be used for sorting.
+//
+// See function GetN for more information.
+//
+// Available: since v0.5.2
+func (dao *UniversalDaoDynamodb) MapGsi(gsiName string, fieldNames ...string) *UniversalDaoDynamodb {
+	if dao.gsiSortMapping == nil {
+		dao.gsiSortMapping = make(map[string]string)
+	}
+	if len(fieldNames) > 0 {
+		key := strings.Join(fieldNames, ":")
+		dao.gsiSortMapping[key] = strings.TrimSpace(gsiName)
+	}
+	return dao
 }
 
 // GetTableName returns name of database table to store business objects.
@@ -532,22 +550,41 @@ func toConditionBuilder(input interface{}) (*expression.ConditionBuilder, error)
 }
 
 // GetN implements UniversalDao.GetN.
+//
+// Currently, AWS DynamoDB does not support custom sorting. Since v0.5.2, UniversalDaoDynamodb allows limited sorting via GSI:
+//   - Once sorting parameter is specified, this function looks up GSI name from field names (see function MapGsi).
+//   - If GSI name is found, data will be queried using the GSI.
+// Note: Only ascending order is supported, also it's responsibility of application to:
+//   - Create GSIs.
+//   - Map fields to GSI by calling function MapGsi.
+//   - Supply appropriate filter.
 func (dao *UniversalDaoDynamodb) GetN(fromOffset, maxNumRows int, filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
-	// TODO AWS DynamoDB does not currently support custom sorting
-
 	if dao.pkPrefix != "" && dao.pkPrefixValue != "" {
 		/* multi-tenant: add tenant filtering */
-		convertFilter, err := toConditionBuilder(filter)
-		if err != nil {
-			return nil, err
+		tf := &godal.FilterOptAnd{}
+		if filter != nil {
+			tf = tf.Add(filter)
 		}
-		t := expression.Name(dao.pkPrefix).Equal(expression.Value(dao.pkPrefixValue))
-		if convertFilter != nil {
-			t = t.And(*convertFilter)
-		}
-		filter = &t
+		tf.Add(&godal.FilterOptFieldOpValue{FieldName: dao.pkPrefix, Operator: godal.FilterOpEqual, Value: dao.pkPrefixValue})
+		filter = tf
 	}
-	gboList, err := dao.GdaoFetchMany(dao.tableName, filter, sorting, fromOffset, maxNumRows)
+	tableName := dao.tableName
+	if sorting != nil && len(sorting.Fields) > 0 {
+		scanIndexBackward := sorting.Fields[0].Descending
+		gsiFields := make([]string, len(sorting.Fields))
+		for i, field := range sorting.Fields {
+			gsiFields[i] = field.FieldName
+		}
+		gsiName, ok := dao.gsiSortMapping[strings.Join(gsiFields, ":")]
+		if !ok || gsiName == "" {
+			return nil, errors.New("cannot look up GSI name for input")
+		}
+		tableName = "@" + dao.tableName + ":" + gsiName + ":true"
+		if scanIndexBackward {
+			tableName = "!" + tableName
+		}
+	}
+	gboList, err := dao.GdaoFetchMany(tableName, filter, nil, fromOffset, maxNumRows)
 	if err != nil {
 		return nil, err
 	}
@@ -560,6 +597,9 @@ func (dao *UniversalDaoDynamodb) GetN(fromOffset, maxNumRows int, filter godal.F
 }
 
 // GetAll implements UniversalDao.GetAll.
+//
+// Currently, AWS DynamoDB does not support custom sorting.
+// Since v0.5.2, UniversalDaoDynamodb allows limited sorting via GSI. See function GetN for more information.
 func (dao *UniversalDaoDynamodb) GetAll(filter godal.FilterOpt, sorting *godal.SortingOpt) ([]*UniversalBo, error) {
 	return dao.GetN(0, 0, filter, sorting)
 }

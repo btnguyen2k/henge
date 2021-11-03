@@ -20,7 +20,7 @@ import (
 
 const (
 	// Version of package henge.
-	Version = "0.5.1"
+	Version = "0.5.2"
 )
 
 // clone a map, deep clone if possible.
