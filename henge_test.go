@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/btnguyen2k/consu/reddo"
+	"github.com/btnguyen2k/godal"
 )
 
 func Test_cloneMap_nil(t *testing.T) {
@@ -583,5 +584,97 @@ func TestRowMapper(t *testing.T) {
 	expectedColList := append(sqlColumnNames, "zuid")
 	if !reflect.DeepEqual(myColList, expectedColList) {
 		t.Fatalf("%s failed: expected column list %#v but received %#v", name, expectedColList, myColList)
+	}
+}
+
+type testMyBo struct {
+	*UniversalBo
+	Name string
+}
+
+func (bo *testMyBo) Sync(opts ...UboSyncOpts) *testMyBo {
+	bo.SetDataAttr("name", bo.Name)
+	bo.UniversalBo.Sync(opts...)
+	return bo
+}
+
+func _newMyBoFromUbo(ubo *UniversalBo) *testMyBo {
+	if ubo == nil {
+		return nil
+	}
+	ubo = ubo.Clone()
+	bo := &testMyBo{UniversalBo: ubo}
+	if v, err := ubo.GetDataAttrAs("name", reddo.TypeString); err != nil {
+		return nil
+	} else {
+		bo.Name, _ = v.(string)
+	}
+	return bo.Sync()
+}
+
+func TestBuildBoFromUbo_PreserveTimestamp(t *testing.T) {
+	name := "TestBuildBoFromUbo_PreserveTimestamp"
+	TimestampRounding = TimestampRoundSettingNone
+	gbo := godal.NewGenericBo()
+	_now := time.Now()
+	_next := _now.Add(7 * time.Second)
+	gbo.GboSetAttr(FieldTimeCreated, _now)
+	gbo.GboSetAttr(FieldTimeUpdated, _next)
+	gbo.GboSetAttr(FieldChecksum, "")
+	_id := "1"
+	_tag := 1024
+	gbo.GboSetAttr(FieldId, _id)
+	gbo.GboSetAttr(FieldTagVersion, _tag)
+	gbo.GboSetAttr(FieldData, `{"key":"value"}`)
+
+	// fmt.Println(_now, "/", _next)
+	ubo := NewUniversalBoFromGbo(gbo)
+	if ubo == nil {
+		t.Fatalf("%s failed: nil", name)
+	}
+	// fmt.Println(ubo.GetTimeCreated(), "/", ubo.GetTimeUpdated())
+	if !_now.Equal(ubo.GetTimeCreated()) {
+		t.Fatalf("%s failed - expected UBO timeCreated %s but received %s", name, _now, ubo.GetTimeCreated())
+	}
+	if !_next.Equal(ubo.GetTimeUpdated()) {
+		t.Fatalf("%s failed - expected UBO timeUpdated %s but received %s", name, _next, ubo.GetTimeUpdated())
+	}
+
+	bo := _newMyBoFromUbo(ubo)
+	if bo == nil {
+		t.Fatalf("%s failed: nil", name)
+	}
+	// fmt.Println(bo.GetTimeCreated(), "/", bo.GetTimeUpdated())
+	if !_now.Equal(bo.GetTimeCreated()) {
+		t.Fatalf("%s failed - expected BO timeCreated %s but received %s", name, _now, bo.GetTimeCreated())
+	}
+	if !_next.Equal(bo.GetTimeUpdated()) {
+		t.Fatalf("%s failed - expected BO timeUpdated %s but received %s", name, _next, bo.GetTimeUpdated())
+	}
+
+	bo.Sync()
+	if !_now.Equal(bo.GetTimeCreated()) {
+		t.Fatalf("%s failed - expected BO timeCreated %s but received %s", name, _now, bo.GetTimeCreated())
+	}
+	if !_next.Equal(bo.GetTimeUpdated()) {
+		t.Fatalf("%s failed - expected BO timeUpdated %s but received %s", name, _next, bo.GetTimeUpdated())
+	}
+
+	bo.Sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
+	if !_now.Equal(bo.GetTimeCreated()) {
+		t.Fatalf("%s failed - expected BO timeCreated %s but received %s", name, _now, bo.GetTimeCreated())
+	}
+	if !_next.Equal(bo.GetTimeUpdated()) {
+		t.Fatalf("%s failed - expected BO timeUpdated %s but received %s", name, _next, bo.GetTimeUpdated())
+	}
+
+	bo.Name += "-traling"
+	now := time.Now()
+	bo.Sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
+	if !_now.Equal(bo.GetTimeCreated()) {
+		t.Fatalf("%s failed - expected BO timeCreated %s but received %s", name, _now, bo.GetTimeCreated())
+	}
+	if bo.GetTimeUpdated().Before(now) {
+		t.Fatalf("%s failed - expected BO timeUpdated %s but received %s", name, now, bo.GetTimeUpdated())
 	}
 }
