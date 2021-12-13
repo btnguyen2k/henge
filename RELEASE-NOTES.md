@@ -1,5 +1,12 @@
 # henge release notes
 
+## 2021-12-12 - v0.5.3
+
+- New type `UboSyncOpts`.
+- `UniversalBo.Sync()` and `UniversalBo._sync()` now accept optional array of `UboSyncOpts` as parameter.
+- `henge` call `UniversalBo.Sync()` and `UniversalBo._sync()` with `UboSyncOpts{UpdateTimestampIfChecksumChange: true}` by default.
+
+
 ## 2021-11-03 - v0.5.2
 
 - Migrated to `prom v0.2.15`, `UniversalDaoDynamodb` now supports basic sorting (via GSI).

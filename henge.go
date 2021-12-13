@@ -20,7 +20,7 @@ import (
 
 const (
 	// Version of package henge.
-	Version = "0.5.2"
+	Version = "0.5.3"
 )
 
 // clone a map, deep clone if possible.
@@ -86,7 +86,7 @@ func NewUniversalBo(id string, tagVersion uint64) *UniversalBo {
 		_dirty:      true,
 		_extraAttrs: make(map[string]interface{}),
 	}
-	return bo.Sync()
+	return bo.Sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
 }
 
 // NewUniversalBoFromGbo is helper function to construct a new UniversalBo from transforms godal.IGenericBo.
@@ -102,7 +102,7 @@ func NewUniversalBoFromGbo(gbo godal.IGenericBo) *UniversalBo {
 		delete(extraAttrs, field)
 	}
 	tcreated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
-	tupdated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
+	tupdated, _ := gbo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
 	bo := &UniversalBo{
 		id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
 		dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
@@ -181,6 +181,14 @@ var (
 	topLevelFieldList = []string{FieldId, FieldData, FieldChecksum, FieldTagVersion, FieldTimeCreated, FieldTimeUpdated}
 )
 
+// UboSyncOpts specifies behaviors of UniversalBo.Sync function.
+//
+// Available since v0.5.3
+type UboSyncOpts struct {
+	UpdateTimestamp                 bool // if true, UniversalBo's last-updated timestamp is updated with the current timestamp
+	UpdateTimestampIfChecksumChange bool // if true, UniversalBo's last-updated timestamp is updated with the current timestamp if BO's checksum changes
+}
+
 // UniversalBo is the NoSQL style universal business object. Business attributes are stored in a JSON-encoded attribute.
 type UniversalBo struct {
 	/* top level attributes */
@@ -258,7 +266,7 @@ func (ubo *UniversalBo) ToMap(preFunc FuncPreUboToMap, postFunc FuncPostUboToMap
 
 // MarshalJSON implements json.encode.Marshaler.MarshalJSON.
 func (ubo *UniversalBo) MarshalJSON() ([]byte, error) {
-	ubo.Sync()
+	ubo.Sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
 	ubo._lock.RLock()
 	defer ubo._lock.RUnlock()
 	m := map[string]interface{}{
@@ -314,7 +322,7 @@ func (ubo *UniversalBo) UnmarshalJSON(data []byte) error {
 		ubo._extraAttrs = m[FieldExtras].(map[string]interface{})
 	}
 	ubo._setDataJson(m[FieldData].(string))
-	ubo._sync()
+	ubo._sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
 	return nil
 }
 
@@ -551,9 +559,27 @@ func (ubo *UniversalBo) SetExtraAttr(key string, value interface{}) *UniversalBo
 	return ubo
 }
 
-func (ubo *UniversalBo) _sync() *UniversalBo {
+func _requireTimeUpdatedSync(opts ...UboSyncOpts) bool {
+	for _, opt := range opts {
+		if opt.UpdateTimestamp {
+			return true
+		}
+	}
+	return false
+}
+
+func _requireTimeUpdatedSyncIfChecksumChange(opts ...UboSyncOpts) bool {
+	for _, opt := range opts {
+		if opt.UpdateTimestampIfChecksumChange {
+			return true
+		}
+	}
+	return false
+}
+
+func (ubo *UniversalBo) _sync(opts ...UboSyncOpts) *UniversalBo {
 	if ubo._dirty {
-		ubo.timeUpdated = roundTimestamp(time.Now(), TimestampRounding)
+		oldChecksum := ubo.checksum
 		csumMap := map[string]interface{}{
 			"id":          ubo.id,
 			"app_version": ubo.tagVersion,
@@ -562,6 +588,10 @@ func (ubo *UniversalBo) _sync() *UniversalBo {
 			"extra":       ubo._extraAttrs,
 		}
 		ubo.checksum = fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
+		if _requireTimeUpdatedSync(opts...) ||
+			(_requireTimeUpdatedSyncIfChecksumChange(opts...) && oldChecksum != ubo.checksum) {
+			ubo.timeUpdated = roundTimestamp(time.Now(), TimestampRounding)
+		}
 		js, _ := json.Marshal(ubo._data)
 		ubo.dataJson = string(js)
 		ubo._dirty = false
@@ -570,18 +600,17 @@ func (ubo *UniversalBo) _sync() *UniversalBo {
 }
 
 // Sync syncs user-defined attribute values to JSON format.
-func (ubo *UniversalBo) Sync() *UniversalBo {
+func (ubo *UniversalBo) Sync(opts ...UboSyncOpts) *UniversalBo {
 	ubo._lock.Lock()
 	defer ubo._lock.Unlock()
-	return ubo._sync()
+	return ubo._sync(opts...)
 }
 
 // Clone creates a cloned copy of the business object.
 func (ubo *UniversalBo) Clone() *UniversalBo {
-	// ubo.Sync()
 	ubo._lock.RLock()
 	defer ubo._lock.RUnlock()
-	ubo._sync()
+	ubo._sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
 	clone := &UniversalBo{
 		id:          ubo.id,
 		dataJson:    ubo.dataJson,
