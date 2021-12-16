@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	awsdynamodb "github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
@@ -164,8 +165,8 @@ func (r *rowMapperDynamodb) ToRow(tableName string, bo godal.IGenericBo) (interf
 	row, err := r.wrap.ToRow(tableName, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
 		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
-		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
-		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
+		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, time.RFC3339)
+		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, time.RFC3339)
 		m[FieldData], _ = bo.GboGetAttrUnmarshalJson(FieldData) // Note: FieldData must be JSON-encoded string!
 	}
 	return row, err

@@ -2,6 +2,7 @@ package henge
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
@@ -51,8 +52,8 @@ func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface
 			delete(m, FieldId)
 		}
 		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
-		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
-		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
+		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, time.RFC3339)
+		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, time.RFC3339)
 		m[FieldData], _ = bo.GboGetAttrUnmarshalJson(FieldData) // Note: FieldData must be JSON-encoded string!
 	}
 	return row, err

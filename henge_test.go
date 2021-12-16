@@ -323,7 +323,7 @@ func TestUniversalBo_datatypes(t *testing.T) {
 	ubo.SetDataAttr("data.string", vString)
 	vTime := time.Now()
 	ubo.SetDataAttr("data.time[0]", vTime)
-	ubo.SetDataAttr("data.time[1]", vTime.Format(TimeLayout))
+	ubo.SetDataAttr("data.time[1]", vTime.Format(ubo._timeLayout))
 
 	if v, err := ubo.GetDataAttrAs("data.number[0]", reddo.TypeInt); err != nil {
 		t.Fatalf("%s failed: %#e", name, err)
@@ -350,14 +350,14 @@ func TestUniversalBo_datatypes(t *testing.T) {
 	} else if v != vString {
 		t.Fatalf("%s failed [string]: expected %#v but received %#v", name, vString, v)
 	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("data.time[0]", TimeLayout); err != nil {
+	if v, err := ubo.GetDataAttrAsTimeWithLayout("data.time[0]", ubo._timeLayout); err != nil {
 		t.Fatalf("%s failed: %#e", name, err)
-	} else if v.Format(TimeLayout) != vTime.Format(TimeLayout) {
+	} else if v.Format(ubo._timeLayout) != vTime.Format(ubo._timeLayout) {
 		t.Fatalf("%s failed [time]: expected %#v but received %#v", name, vTime, v)
 	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("data.time[1]", TimeLayout); err != nil {
+	if v, err := ubo.GetDataAttrAsTimeWithLayout("data.time[1]", ubo._timeLayout); err != nil {
 		t.Fatalf("%s failed: %#e", name, err)
-	} else if v.Format(TimeLayout) != vTime.Format(TimeLayout) {
+	} else if v.Format(ubo._timeLayout) != vTime.Format(ubo._timeLayout) {
 		t.Fatalf("%s failed [time]: expected %#v but received %#v", name, vTime, v)
 	}
 }
@@ -374,11 +374,11 @@ func TestUniversalBo_json(t *testing.T) {
 	vString := "a string"
 	ubo1.SetDataAttr("data.string", vString)
 	vTime := time.Now()
-	ubo1.SetDataAttr("data.time[0]", vTime.Format(TimeLayout))
-	ubo1.SetDataAttr("data.time[1]", vTime.Format(TimeLayout))
+	ubo1.SetDataAttr("data.time[0]", vTime.Format(ubo1._timeLayout))
+	ubo1.SetDataAttr("data.time[1]", vTime.Format(ubo1._timeLayout))
 	js1, _ := json.Marshal(ubo1)
 
-	var ubo2 *UniversalBo
+	ubo2 := &UniversalBo{_timeLayout: ubo1._timeLayout, _timestampRounding: ubo1._timestampRounding}
 	err := json.Unmarshal(js1, &ubo2)
 	if err != nil {
 		t.Fatalf("%s failed: %s", name, err)
@@ -454,7 +454,7 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 	ubo.SetExtraAttr("str", "a string")
 	ubo.SetExtraAttr("int", 123)
 	ubo.SetExtraAttr("b", true)
-	ubo.SetExtraAttr("dstr", now.Format(TimeLayout))
+	ubo.SetExtraAttr("dstr", now.Format(ubo._timeLayout))
 	ubo.SetExtraAttr("d", &now)
 	fields := []string{"str", "int", "b", "dstr", "d"}
 	m := ubo.GetExtraAttrs()
@@ -474,20 +474,20 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 	if v := ubo.GetExtraAttrAsUnsafe("int", reddo.TypeInt); v != int64(123) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, 123, v)
 	}
-	if v, err := ubo.GetExtraAttrAsTimeWithLayout("d", TimeLayout); err != nil {
+	if v, err := ubo.GetExtraAttrAsTimeWithLayout("d", ubo._timeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(TimeLayout), v.Format(TimeLayout))
+		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(ubo._timeLayout), v.Format(ubo._timeLayout))
 	}
-	if v, err := ubo.GetExtraAttrAsTimeWithLayout("dstr", TimeLayout); err != nil {
+	if v, err := ubo.GetExtraAttrAsTimeWithLayout("dstr", ubo._timeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("d", TimeLayout); v.Second() != now.Second() {
+	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("d", ubo._timeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("dstr", TimeLayout); v.Second() != now.Second() {
+	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("dstr", ubo._timeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
 }
@@ -499,7 +499,7 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 	ubo.SetDataAttr("s.t.r.str", "a string")
 	ubo.SetDataAttr("i[0].int", 123)
 	ubo.SetDataAttr("b", true)
-	ubo.SetDataAttr("time[0]", now.Format(TimeLayout))
+	ubo.SetDataAttr("time[0]", now.Format(ubo._timeLayout))
 	ubo.SetDataAttr("time[1]", &now)
 	fields := []string{"s.t.r.str", "i[0].int", "b", "time[0]", "time[1]"}
 	for _, f := range fields {
@@ -520,20 +520,20 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 	if v := ubo.GetDataAttrAsUnsafe("i[0].int", reddo.TypeInt); v != int64(123) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, 123, v)
 	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[0]", TimeLayout); err != nil {
+	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[0]", ubo._timeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(TimeLayout), v.Format(TimeLayout))
+		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(ubo._timeLayout), v.Format(ubo._timeLayout))
 	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[1]", TimeLayout); err != nil {
+	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[1]", ubo._timeLayout); err != nil {
 		t.Fatalf("%s failed: %s", name, err)
 	} else if v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[0]", TimeLayout); v.Second() != now.Second() {
+	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[0]", ubo._timeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
-	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[1]", TimeLayout); v.Second() != now.Second() {
+	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[1]", ubo._timeLayout); v.Second() != now.Second() {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
 	}
 }
@@ -614,7 +614,6 @@ func _newMyBoFromUbo(ubo *UniversalBo) *testMyBo {
 
 func TestBuildBoFromUbo_PreserveTimestamp(t *testing.T) {
 	name := "TestBuildBoFromUbo_PreserveTimestamp"
-	TimestampRounding = TimestampRoundSettingNone
 	gbo := godal.NewGenericBo()
 	_now := time.Now()
 	_next := _now.Add(7 * time.Second)
@@ -628,7 +627,7 @@ func TestBuildBoFromUbo_PreserveTimestamp(t *testing.T) {
 	gbo.GboSetAttr(FieldData, `{"key":"value"}`)
 
 	// fmt.Println(_now, "/", _next)
-	ubo := NewUniversalBoFromGbo(gbo)
+	ubo := NewUniversalBoFromGbo(gbo, UboOpt{TimestampRounding: TimestampRoundSettingNone})
 	if ubo == nil {
 		t.Fatalf("%s failed: nil", name)
 	}
