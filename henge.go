@@ -20,7 +20,7 @@ import (
 
 const (
 	// Version of package henge.
-	Version = "0.5.3"
+	Version = "0.5.4"
 )
 
 // clone a map, deep clone if possible.
@@ -73,18 +73,45 @@ func cloneSlice(src []interface{}) []interface{} {
 	return result
 }
 
+// UboOpt can be supplied to NewUniversalBo and NewUniversalBoFromGbo to specify newly created BO's settings.
+// Available since v0.5.4
+type UboOpt struct {
+	TimeLayout        string
+	TimestampRounding TimestampRoundSetting
+}
+
+func _extractTimeLayout(opts ...UboOpt) string {
+	for _, opt := range opts {
+		if opt.TimeLayout != "" {
+			return opt.TimeLayout
+		}
+	}
+	return DefaultTimeLayout
+}
+
+func _extractTimestampRounding(opts ...UboOpt) TimestampRoundSetting {
+	for _, opt := range opts {
+		if opt.TimestampRounding >= TimestampRoundSettingNone && opt.TimestampRounding <= TimestampRoundSettingSecond {
+			return opt.TimestampRounding
+		}
+	}
+	return DefaultTimestampRoundSetting
+}
+
 // NewUniversalBo is helper function to create a new UniversalBo instance.
 //
 // Note: id will be space-trimmed.
-func NewUniversalBo(id string, tagVersion uint64) *UniversalBo {
-	now := roundTimestamp(time.Now(), TimestampRounding)
+func NewUniversalBo(id string, tagVersion uint64, opts ...UboOpt) *UniversalBo {
+	now := time.Now()
 	bo := &UniversalBo{
-		id:          strings.TrimSpace(id),
-		timeCreated: now,
-		timeUpdated: now,
-		tagVersion:  tagVersion,
-		_dirty:      true,
-		_extraAttrs: make(map[string]interface{}),
+		id:                 strings.TrimSpace(id),
+		timeCreated:        now,
+		timeUpdated:        now,
+		tagVersion:         tagVersion,
+		_dirty:             true,
+		_extraAttrs:        make(map[string]interface{}),
+		_timeLayout:        _extractTimeLayout(opts...),
+		_timestampRounding: _extractTimestampRounding(opts...),
 	}
 	return bo.Sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
 }
@@ -92,7 +119,7 @@ func NewUniversalBo(id string, tagVersion uint64) *UniversalBo {
 // NewUniversalBoFromGbo is helper function to construct a new UniversalBo from transforms godal.IGenericBo.
 //
 // Available since v0.4.1
-func NewUniversalBoFromGbo(gbo godal.IGenericBo) *UniversalBo {
+func NewUniversalBoFromGbo(gbo godal.IGenericBo, opts ...UboOpt) *UniversalBo {
 	if gbo == nil {
 		return nil
 	}
@@ -101,17 +128,21 @@ func NewUniversalBoFromGbo(gbo godal.IGenericBo) *UniversalBo {
 	for _, field := range topLevelFieldList {
 		delete(extraAttrs, field)
 	}
-	tcreated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, TimeLayout)
-	tupdated, _ := gbo.GboGetTimeWithLayout(FieldTimeUpdated, TimeLayout)
+	_timeLayout := _extractTimeLayout(opts...)
+	_timestampRounding := _extractTimestampRounding(opts...)
+	tcreated, _ := gbo.GboGetTimeWithLayout(FieldTimeCreated, _timeLayout)
+	tupdated, _ := gbo.GboGetTimeWithLayout(FieldTimeUpdated, _timeLayout)
 	bo := &UniversalBo{
-		id:          gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
-		dataJson:    gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
-		checksum:    gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
-		timeCreated: tcreated,
-		timeUpdated: tupdated,
-		tagVersion:  gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
-		_extraAttrs: extraAttrs,
-		_dirty:      true,
+		id:                 gbo.GboGetAttrUnsafe(FieldId, reddo.TypeString).(string),
+		dataJson:           gbo.GboGetAttrUnsafe(FieldData, reddo.TypeString).(string),
+		checksum:           gbo.GboGetAttrUnsafe(FieldChecksum, reddo.TypeString).(string),
+		timeCreated:        tcreated,
+		timeUpdated:        tupdated,
+		tagVersion:         gbo.GboGetAttrUnsafe(FieldTagVersion, reddo.TypeUint).(uint64),
+		_extraAttrs:        extraAttrs,
+		_dirty:             true,
+		_timeLayout:        _timeLayout,
+		_timestampRounding: _timestampRounding,
 	}
 	if err := bo._parseDataJson(dataInitNone); err != nil {
 		return nil
@@ -122,46 +153,61 @@ func NewUniversalBoFromGbo(gbo godal.IGenericBo) *UniversalBo {
 const (
 	// FieldId is a top level field: BO's unique id.
 	FieldId = "id"
+
 	// FieldData is a top level field: BO's user-defined attributes in JSON format.
 	FieldData = "data"
+
 	// FieldTagVersion is a top level field: BO's "tag-version" - a value that can be used for compatibility check or data migration.
 	FieldTagVersion = "tver"
+
 	// FieldChecksum is a top level field: checksum of BO's value.
 	FieldChecksum = "csum"
+
 	// FieldTimeCreated is a top level field: BO's creation timestamp.
 	FieldTimeCreated = "tcre"
+
 	// FieldTimeUpdated is a top level field: BO's last-updated timestamp.
 	FieldTimeUpdated = "tupd"
+
 	// FieldExtras is an internally used field.
 	FieldExtras = "_ext"
 )
 
 // TimestampRoundSetting specifies how UniversalBo would round timestamp before storing.
+//
+// Available since v0.4.0
 type TimestampRoundSetting int
 
 const (
 	// TimestampRoundSettingNone specifies that timestamp is not rounded.
 	TimestampRoundSettingNone TimestampRoundSetting = iota
+
 	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to nanosecond.
 	TimestampRoundSettingNanosecond
+
 	// TimestampRoundSettingMicrosecond specifies that timestamp is rounded to microsecond.
 	TimestampRoundSettingMicrosecond
+
 	// TimestampRoundSettingMillisecond specifies that timestamp is rounded to millisecond.
 	TimestampRoundSettingMillisecond
+
 	// TimestampRoundSettingSecond specifies that timestamp is rounded to second.
 	TimestampRoundSettingSecond
 )
 
-var (
-	// TimeLayout is used to convert datetime values to strings and vice versa.
-	// Note: since v0.4.1 TimeLayout is a variable, no longer a const.
-	TimeLayout = time.RFC3339
+const (
+	// DefaultTimestampRoundSetting is the default TimestampRoundSetting to be used if such setting is not specified.
+	//
+	// Available since v0.5.4
+	DefaultTimestampRoundSetting = TimestampRoundSettingSecond
 
-	// TimestampRounding controls how UniversalBo would round timestamp before storing.
-	TimestampRounding TimestampRoundSetting = TimestampRoundSettingSecond
+	// DefaultTimeLayout is the default layout used by UniversalBo to convert datetime values to string and vice versa if such setting is not specified.
+	//
+	// Available since v0.5.4
+	DefaultTimeLayout = time.RFC3339
 )
 
-// roundTimestamp round the input time and return the result.
+// roundTimestamp rounds the input time and return the result.
 // available since v0.4.0
 func roundTimestamp(t time.Time, trs TimestampRoundSetting) time.Time {
 	switch trs {
@@ -200,17 +246,21 @@ type UniversalBo struct {
 	timeUpdated time.Time `json:"tupd"` // bo's last-updated timestamp
 
 	/* computed attributes */
-	_data       interface{}            `json:"-"`    // deserialized form of data-json
-	_sdata      *semita.Semita         `json:"-"`    // used to access data in hierarchy manner
-	_extraAttrs map[string]interface{} `json:"_ext"` // other top-level arbitrary attributes
-	_lock       sync.RWMutex
-	_dirty      bool
+	_data  interface{}    `json:"-"` // deserialized form of data-json
+	_sdata *semita.Semita `json:"-"` // used to access data in hierarchy manner
+
+	/* internal attributes */
+	_extraAttrs        map[string]interface{} `json:"_ext"` // other top-level arbitrary attributes
+	_lock              sync.RWMutex
+	_dirty             bool
+	_timeLayout        string
+	_timestampRounding TimestampRoundSetting
 }
 
-// FuncPreUboToMap is used by UniversalBo.ToMap to export a UniversalBo to a map[string]interface{}.
+// FuncPreUboToMap is used by UniversalBo.ToMap to export UniversalBo's attributes to a map[string]interface{}.
 type FuncPreUboToMap func(*UniversalBo) map[string]interface{}
 
-// FuncPostUboToMap is used by UniversalBo.ToMap to transform the result map (output from FuncPreUboToMap) further.
+// FuncPostUboToMap is used by UniversalBo.ToMap to transform the result map (output from FuncPreUboToMap) to another map[string]interface{}.
 type FuncPostUboToMap func(map[string]interface{}) map[string]interface{}
 
 // DefaultFuncPreUboToMap is default implementation of FuncPreUboToMap.
@@ -274,8 +324,8 @@ func (ubo *UniversalBo) MarshalJSON() ([]byte, error) {
 		FieldData:        ubo.dataJson,
 		FieldTagVersion:  ubo.tagVersion,
 		FieldChecksum:    ubo.checksum,
-		FieldTimeCreated: ubo.timeCreated.Format(TimeLayout),
-		FieldTimeUpdated: ubo.timeUpdated.Format(TimeLayout),
+		FieldTimeCreated: ubo.timeCreated.Format(ubo._timeLayout),
+		FieldTimeUpdated: ubo.timeUpdated.Format(ubo._timeLayout),
 		FieldExtras:      cloneMap(ubo._extraAttrs),
 	}
 	return json.Marshal(m)
@@ -283,6 +333,11 @@ func (ubo *UniversalBo) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.decode.Unmarshaler.UnmarshalJSON.
 func (ubo *UniversalBo) UnmarshalJSON(data []byte) error {
+	timeLayout := ubo._timeLayout
+	if timeLayout == "" {
+		timeLayout = DefaultTimeLayout
+	}
+
 	var m map[string]interface{}
 	err := json.Unmarshal(data, &m)
 	if err == nil {
@@ -298,10 +353,10 @@ func (ubo *UniversalBo) UnmarshalJSON(data []byte) error {
 		m[FieldChecksum], err = reddo.ToString(m[FieldChecksum])
 	}
 	if err == nil {
-		m[FieldTimeCreated], err = reddo.ToTimeWithLayout(m[FieldTimeCreated], TimeLayout)
+		m[FieldTimeCreated], err = reddo.ToTimeWithLayout(m[FieldTimeCreated], timeLayout)
 	}
 	if err == nil {
-		m[FieldTimeUpdated], err = reddo.ToTimeWithLayout(m[FieldTimeUpdated], TimeLayout)
+		m[FieldTimeUpdated], err = reddo.ToTimeWithLayout(m[FieldTimeUpdated], timeLayout)
 	}
 	if err == nil {
 		m[FieldExtras], err = reddo.ToMap(m[FieldExtras], reflect.TypeOf(map[string]interface{}{}))
@@ -412,6 +467,40 @@ func (ubo *UniversalBo) GetChecksum() string {
 	return ubo.checksum
 }
 
+// GetTimeLayout returns this BO's time-layout setting.
+// Time-layout is used to format BO's create/update timestamp to string and vice versa.
+//
+// Available since v0.5.4
+func (ubo *UniversalBo) GetTimeLayout() string {
+	return ubo._timeLayout
+}
+
+// SetTimeLayout updates this BO's time-layout setting.
+// Time-layout is used to format BO's create/update timestamp to string and vice versa.
+//
+// Available since v0.5.4
+func (ubo *UniversalBo) SetTimeLayout(value string) *UniversalBo {
+	ubo._timeLayout = value
+	return ubo
+}
+
+// GetTimestampRounding returns this BO's timestamp-rounding setting.
+// Timestamp-rounding controls how BO's create/update timestamp will be rounded before storing.
+//
+// Available since v0.5.4
+func (ubo *UniversalBo) GetTimestampRounding() TimestampRoundSetting {
+	return ubo._timestampRounding
+}
+
+// SetTimestampRounding updates this BO's timestamp-rounding setting.
+// Timestamp-rounding controls how BO's create/update timestamp will be rounded before storing.
+//
+// Available since v0.5.4
+func (ubo *UniversalBo) SetTimestampRounding(value TimestampRoundSetting) *UniversalBo {
+	ubo._timestampRounding = value
+	return ubo
+}
+
 // GetTimeCreated returns value of bo's 'timestamp-created' field.
 func (ubo *UniversalBo) GetTimeCreated() time.Time {
 	return ubo.timeCreated
@@ -493,11 +582,11 @@ func (ubo *UniversalBo) SetDataAttr(path string, value interface{}) error {
 	}
 	switch value.(type) {
 	case time.Time:
-		value, _ = time.Parse(TimeLayout, value.(time.Time).Format(TimeLayout))
-		value = roundTimestamp(value.(time.Time), TimestampRounding)
+		value, _ = time.Parse(ubo._timeLayout, value.(time.Time).Format(ubo._timeLayout))
+		value = roundTimestamp(value.(time.Time), ubo._timestampRounding)
 	case *time.Time:
-		value, _ = time.Parse(TimeLayout, value.(*time.Time).Format(TimeLayout))
-		value = roundTimestamp(value.(time.Time), TimestampRounding)
+		value, _ = time.Parse(ubo._timeLayout, value.(*time.Time).Format(ubo._timeLayout))
+		value = roundTimestamp(value.(time.Time), ubo._timestampRounding)
 	}
 	return ubo._sdata.SetValue(path, value)
 }
@@ -549,11 +638,11 @@ func (ubo *UniversalBo) SetExtraAttr(key string, value interface{}) *UniversalBo
 	ubo._dirty = true
 	switch value.(type) {
 	case time.Time:
-		value, _ = time.Parse(TimeLayout, value.(time.Time).Format(TimeLayout))
-		value = roundTimestamp(value.(time.Time), TimestampRounding)
+		value, _ = time.Parse(ubo._timeLayout, value.(time.Time).Format(ubo._timeLayout))
+		value = roundTimestamp(value.(time.Time), ubo._timestampRounding)
 	case *time.Time:
-		value, _ = time.Parse(TimeLayout, value.(*time.Time).Format(TimeLayout))
-		value = roundTimestamp(value.(time.Time), TimestampRounding)
+		value, _ = time.Parse(ubo._timeLayout, value.(*time.Time).Format(ubo._timeLayout))
+		value = roundTimestamp(value.(time.Time), ubo._timestampRounding)
 	}
 	ubo._extraAttrs[key] = value
 	return ubo
@@ -579,18 +668,23 @@ func _requireTimeUpdatedSyncIfChecksumChange(opts ...UboSyncOpts) bool {
 
 func (ubo *UniversalBo) _sync(opts ...UboSyncOpts) *UniversalBo {
 	if ubo._dirty {
+		if ubo._timeLayout == "" {
+			ubo._timeLayout = DefaultTimeLayout
+		}
+		ubo.timeCreated = roundTimestamp(ubo.timeCreated, ubo._timestampRounding)
+		ubo.timeUpdated = roundTimestamp(ubo.timeUpdated, ubo._timestampRounding)
 		oldChecksum := ubo.checksum
 		csumMap := map[string]interface{}{
 			"id":          ubo.id,
 			"app_version": ubo.tagVersion,
-			"t_created":   ubo.timeCreated.In(time.UTC).Format(TimeLayout),
+			"t_created":   ubo.timeCreated.In(time.UTC).Format(ubo._timeLayout),
 			"data":        ubo._data,
 			"extra":       ubo._extraAttrs,
 		}
 		ubo.checksum = fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
 		if _requireTimeUpdatedSync(opts...) ||
 			(_requireTimeUpdatedSyncIfChecksumChange(opts...) && oldChecksum != ubo.checksum) {
-			ubo.timeUpdated = roundTimestamp(time.Now(), TimestampRounding)
+			ubo.timeUpdated = roundTimestamp(time.Now(), ubo._timestampRounding)
 		}
 		js, _ := json.Marshal(ubo._data)
 		ubo.dataJson = string(js)
@@ -612,16 +706,18 @@ func (ubo *UniversalBo) Clone() *UniversalBo {
 	defer ubo._lock.RUnlock()
 	ubo._sync(UboSyncOpts{UpdateTimestampIfChecksumChange: true})
 	clone := &UniversalBo{
-		id:          ubo.id,
-		dataJson:    ubo.dataJson,
-		tagVersion:  ubo.tagVersion,
-		checksum:    ubo.checksum,
-		timeCreated: ubo.timeCreated,
-		timeUpdated: ubo.timeUpdated,
-		_data:       nil,
-		_sdata:      nil,
-		_extraAttrs: cloneMap(ubo._extraAttrs),
-		_dirty:      false,
+		id:                 ubo.id,
+		dataJson:           ubo.dataJson,
+		tagVersion:         ubo.tagVersion,
+		checksum:           ubo.checksum,
+		timeCreated:        ubo.timeCreated,
+		timeUpdated:        ubo.timeUpdated,
+		_data:              nil,
+		_sdata:             nil,
+		_extraAttrs:        cloneMap(ubo._extraAttrs),
+		_dirty:             false,
+		_timeLayout:        ubo._timeLayout,
+		_timestampRounding: ubo._timestampRounding,
 	}
 	clone._parseDataJson(dataInitNone)
 	return clone

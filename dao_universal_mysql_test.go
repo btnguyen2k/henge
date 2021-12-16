@@ -701,7 +701,7 @@ func TestMysql_CreateUpdateGet_Checksum(t *testing.T) {
 			csumMap := map[string]interface{}{
 				"id":          bo.id,
 				"app_version": bo.tagVersion,
-				"t_created":   bo.timeCreated.In(time.UTC).Format(TimeLayout),
+				"t_created":   bo.timeCreated.In(time.UTC).Format(bo._timeLayout),
 				"data":        bo._data,
 				"extra":       bo._extraAttrs,
 			}
@@ -711,7 +711,7 @@ func TestMysql_CreateUpdateGet_Checksum(t *testing.T) {
 			csumMap = map[string]interface{}{
 				"id":          user0.id,
 				"app_version": user0.tagVersion,
-				"t_created":   user0.timeCreated.In(time.UTC).Format(TimeLayout),
+				"t_created":   user0.timeCreated.In(time.UTC).Format(user0._timeLayout),
 				"data":        user0._data,
 				"extra":       user0._extraAttrs,
 			}
