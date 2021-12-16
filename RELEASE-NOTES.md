@@ -2,9 +2,7 @@
 
 ## 2021-12-16 - v0.5.4
 
-- (Breaking change) Migrate timestamp-rounding and time-layout settings to `UniversalBo`. These settings are now
-  per-`UniversalBo` instance, no longer at `henge`'s package-level.
-- Introduce default timestamp-rounding and time-layout settings at `henge`'s package level.
+:q
 
 ## 2021-12-12 - v0.5.3
 

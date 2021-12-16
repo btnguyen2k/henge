@@ -4,9 +4,11 @@
 ## Usage:
 ##   ./release.sh <tag-name>
 
-if [ "$1" == "" ]; then
+if [ X"$1" = X"" ]; then
 	echo "Usage: $0 tag-name"
-	exit -1
+	echo "Example:"
+	echo "\t$0 v0.1.2"
+	exit 1
 fi
 
 echo "$1"
