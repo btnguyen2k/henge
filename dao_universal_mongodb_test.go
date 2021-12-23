@@ -1,7 +1,6 @@
 package henge
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"reflect"
@@ -76,10 +75,6 @@ func TestRowMapperMongo_ColumnsList(t *testing.T) {
 	}
 }
 
-func _cleanupMongo(mc *prom.MongoConnect, collectionName string) error {
-	return mc.GetCollection(collectionName).Drop(nil)
-}
-
 func _testMongoInitMongoConnect(t *testing.T, testName, collectionName string) *prom.MongoConnect {
 	mongoUrl := strings.ReplaceAll(os.Getenv("MONGO_URL"), `"`, "")
 	if mongoUrl == "" {
@@ -97,9 +92,6 @@ func _testMongoInitMongoConnect(t *testing.T, testName, collectionName string) *
 	})
 	if err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "NewMongoConnect", err)
-	}
-	if err := _cleanupMongo(mc, collectionName); err != nil {
-		t.Fatalf("%s/%s failed: %s", testName, "_cleanupMongo", err)
 	}
 	return mc
 }
@@ -122,174 +114,179 @@ func TestInitMongoCollection(t *testing.T) {
 	}
 }
 
-func _testMongoInit(t *testing.T, name, collectionName string) (*prom.MongoConnect, UniversalDao) {
-	mc := _testMongoInitMongoConnect(t, name, collectionName)
-	if err := InitMongoCollection(mc, collectionName); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+var setupTestMongo = func(t *testing.T, testName string) {
+	testMc = _testMongoInitMongoConnect(t, testName, testTable)
+	if err := InitMongoCollection(testMc, testTable); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
+	testMc.GetCollection(testTable).Drop(nil)
 	index := map[string]interface{}{
 		"key":    map[string]interface{}{"email": 1},
 		"name":   "uidx_email",
 		"unique": true,
 	}
-	mc.CreateCollectionIndexes(collectionName, []interface{}{index})
+	testMc.CreateCollectionIndexes(testTable, []interface{}{index})
 	mongoUrl := strings.ReplaceAll(os.Getenv("MONGO_URL"), `"`, "")
 	txModeOnWrite := strings.Contains(mongoUrl, "replicaSet=")
-	if txModeOnWrite {
-		fmt.Println("txModeOnWrite:", txModeOnWrite)
-	}
-	return mc, NewUniversalDaoMongo(mc, collectionName, txModeOnWrite)
+	testDao = NewUniversalDaoMongo(testMc, testTable, txModeOnWrite)
 }
 
-func TestMongo_Create(t *testing.T) {
-	name := "TestMongo_Create"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
-	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
-	ubo.SetExtraAttr("email", "myname@mydomain.com")
-	ubo.SetExtraAttr("age", 35)
-
-	if ok, err := dao.Create(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	} else if !ok {
-		t.Fatalf("%s failed: cannot create record", name)
+var teardownTestMongo = func(t *testing.T, testName string) {
+	if testMc != nil {
+		defer func() { testMc = nil }()
+		testMc.GetCollection(testTable).Drop(nil)
+		testMc.Close(nil)
 	}
 }
 
-func TestMongo_CreateExistingPK(t *testing.T) {
-	name := "TestMongo_CreateExistingPK"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_Create(t *testing.T) {
+	testName := "TestUniversalDaoMongo_Create"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if ok, err := dao.Create(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Create(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot create record", name)
+		t.Fatalf("%s failed: cannot create record", testName)
+	}
+}
+
+func TestUniversalDaoMongo_CreateExistingPK(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateExistingPK"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
+	ubo := NewUniversalBo("id", 1357)
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
+	ubo.SetExtraAttr("email", "myname@mydomain.com")
+	ubo.SetExtraAttr("age", 35)
+
+	if ok, err := testDao.Create(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	} else if !ok {
+		t.Fatalf("%s failed: cannot create record", testName)
 	}
 
 	ubo.SetExtraAttr("email", "myname2@mydomain.com")
-	if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if ok {
-		t.Fatalf("%s failed: record should not be created twice", name)
+		t.Fatalf("%s failed: record should not be created twice", testName)
 	}
 }
 
-func TestMongo_CreateExistingUnique(t *testing.T) {
-	name := "TestMongo_CreateExistingUnique"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateExistingUnique(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateExistingUnique"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if ok, err := dao.Create(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Create(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot create record", name)
+		t.Fatalf("%s failed: cannot create record", testName)
 	}
 
 	ubo.SetId("id2")
-	if ok, err := dao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Create(ubo); err != godal.ErrGdaoDuplicatedEntry {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if ok {
-		t.Fatalf("%s failed: record should not be created twice", name)
+		t.Fatalf("%s failed: record should not be created twice", testName)
 	}
 }
 
-func TestMongo_CreateGet(t *testing.T) {
-	name := "TestMongo_CreateGet"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateGet(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateGet"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if ok, err := dao.Create(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Create(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot create record", name)
+		t.Fatalf("%s failed: cannot create record", testName)
 	}
 
-	if bo, err := dao.Get("id"); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if bo, err := testDao.Get("id"); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if bo == nil {
-		t.Fatalf("%s failed: not found", name)
+		t.Fatalf("%s failed: not found", testName)
 	} else {
 		if v := bo.GetTagVersion(); v != uint64(1357) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, uint64(1357), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, uint64(1357), v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString); v != "Thanh" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Thanh", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.first", reddo.TypeString); v != "Thanh" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Thanh", v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString); v != "Nguyen" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Nguyen", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.last", reddo.TypeString); v != "Nguyen" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Nguyen", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString); v != "myname@mydomain.com" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "myname@mydomain.com", v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "myname@mydomain.com", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt); v != int64(35) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, int64(35), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, int64(35), v)
 		}
 	}
 }
 
-func TestMongo_CreateDelete(t *testing.T) {
-	name := "TestMongo_CreateDelete"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateDelete(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateDelete"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if ok, err := dao.Create(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Create(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot create record", name)
+		t.Fatalf("%s failed: cannot create record", testName)
 	}
 
-	if ok, err := dao.Delete(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Delete(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot delete record", name)
+		t.Fatalf("%s failed: cannot delete record", testName)
 	}
 
-	if bo, err := dao.Get("id"); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if bo, err := testDao.Get("id"); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if bo != nil {
-		t.Fatalf("%s failed: record should be deleted", name)
+		t.Fatalf("%s failed: record should be deleted", testName)
 	}
 
-	if ok, err := dao.Delete(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Delete(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if ok {
-		t.Fatalf("%s failed: record should not be deleted twice", name)
+		t.Fatalf("%s failed: record should not be deleted twice", testName)
 	}
 }
 
-func TestMongo_CreateGetMany(t *testing.T) {
-	name := "TestMongo_CreateGetMany"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateGetMany(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateGetMany"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -299,29 +296,28 @@ func TestMongo_CreateGetMany(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
-		ubo.SetDataAttr("name.first", strconv.Itoa(i))
-		ubo.SetDataAttr("name.last", "Nguyen")
+		ubo.SetDataAttr("testName.first", strconv.Itoa(i))
+		ubo.SetDataAttr("testName.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
 		ubo.SetExtraAttr("age", 35+i)
-		if ok, err := dao.Create(ubo); err != nil {
-			t.Fatalf("%s failed: %s", name, err)
+		if ok, err := testDao.Create(ubo); err != nil {
+			t.Fatalf("%s failed: %s", testName, err)
 		} else if !ok {
-			t.Fatalf("%s failed: cannot create record", name)
+			t.Fatalf("%s failed: cannot create record", testName)
 		}
 	}
 
-	if boList, err := dao.GetAll(nil, nil); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if boList, err := testDao.GetAll(nil, nil); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if len(boList) != 10 {
-		t.Fatalf("%s failed: expected %#v items but received %#v", name, 10, len(boList))
+		t.Fatalf("%s failed: expected %#v items but received %#v", testName, 10, len(boList))
 	}
 }
 
-func TestMongo_CreateGetManyWithFilter(t *testing.T) {
-	name := "TestMongo_CreateGetManyWithFilter"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateGetManyWithFilter(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateGetManyWithFilter"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -331,30 +327,29 @@ func TestMongo_CreateGetManyWithFilter(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
-		ubo.SetDataAttr("name.first", strconv.Itoa(i))
-		ubo.SetDataAttr("name.last", "Nguyen")
+		ubo.SetDataAttr("testName.first", strconv.Itoa(i))
+		ubo.SetDataAttr("testName.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
 		ubo.SetExtraAttr("age", 35+i)
-		if ok, err := dao.Create(ubo); err != nil {
-			t.Fatalf("%s failed: %s", name, err)
+		if ok, err := testDao.Create(ubo); err != nil {
+			t.Fatalf("%s failed: %s", testName, err)
 		} else if !ok {
-			t.Fatalf("%s failed: cannot create record", name)
+			t.Fatalf("%s failed: cannot create record", testName)
 		}
 	}
 
 	filter := &godal.FilterOptFieldOpValue{FieldName: "age", Operator: godal.FilterOpGreaterOrEqual, Value: 35 + 3}
-	if boList, err := dao.GetAll(filter, nil); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if boList, err := testDao.GetAll(filter, nil); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if len(boList) != 7 {
-		t.Fatalf("%s failed: expected %#v items but received %#v", name, 7, len(boList))
+		t.Fatalf("%s failed: expected %#v items but received %#v", testName, 7, len(boList))
 	}
 }
 
-func TestMongo_CreateGetManyWithSorting(t *testing.T) {
-	name := "TestMongo_CreateGetManyWithSorting"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateGetManyWithSorting(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateGetManyWithSorting"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -364,34 +359,33 @@ func TestMongo_CreateGetManyWithSorting(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
-		ubo.SetDataAttr("name.first", strconv.Itoa(i))
-		ubo.SetDataAttr("name.last", "Nguyen")
+		ubo.SetDataAttr("testName.first", strconv.Itoa(i))
+		ubo.SetDataAttr("testName.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
 		ubo.SetExtraAttr("age", 35+i)
-		if ok, err := dao.Create(ubo); err != nil {
-			t.Fatalf("%s failed: %s", name, err)
+		if ok, err := testDao.Create(ubo); err != nil {
+			t.Fatalf("%s failed: %s", testName, err)
 		} else if !ok {
-			t.Fatalf("%s failed: cannot create record", name)
+			t.Fatalf("%s failed: cannot create record", testName)
 		}
 	}
 
 	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
-	if boList, err := dao.GetAll(nil, sorting); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if boList, err := testDao.GetAll(nil, sorting); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else {
 		for i := 0; i < 10; i++ {
 			if boList[i].GetId() != strconv.Itoa(9-i) {
-				t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(9-i), boList[i].GetId())
+				t.Fatalf("%s failed: expected record %#v but received %#v", testName, strconv.Itoa(9-i), boList[i].GetId())
 			}
 		}
 	}
 }
 
-func TestMongo_CreateGetManyWithFilterAndSorting(t *testing.T) {
-	name := "TestMongo_CreateGetManyWithFilterAndSorting"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateGetManyWithFilterAndSorting(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateGetManyWithFilterAndSorting"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -401,35 +395,34 @@ func TestMongo_CreateGetManyWithFilterAndSorting(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
-		ubo.SetDataAttr("name.first", strconv.Itoa(i))
-		ubo.SetDataAttr("name.last", "Nguyen")
+		ubo.SetDataAttr("testName.first", strconv.Itoa(i))
+		ubo.SetDataAttr("testName.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
 		ubo.SetExtraAttr("age", 35+i)
-		if ok, err := dao.Create(ubo); err != nil {
-			t.Fatalf("%s failed: %s", name, err)
+		if ok, err := testDao.Create(ubo); err != nil {
+			t.Fatalf("%s failed: %s", testName, err)
 		} else if !ok {
-			t.Fatalf("%s failed: cannot create record", name)
+			t.Fatalf("%s failed: cannot create record", testName)
 		}
 	}
 
 	filter := godal.FilterOptFieldOpValue{FieldName: "email", Operator: godal.FilterOpLess, Value: "3@mydomain.com"}
 	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
-	if boList, err := dao.GetAll(filter, sorting); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if boList, err := testDao.GetAll(filter, sorting); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if len(boList) != 3 {
-		t.Fatalf("%s failed: expected %#v items but received %#v", name, 3, len(boList))
+		t.Fatalf("%s failed: expected %#v items but received %#v", testName, 3, len(boList))
 	} else {
 		if boList[0].GetId() != "2" || boList[1].GetId() != "1" || boList[2].GetId() != "0" {
-			t.Fatalf("%s failed", name)
+			t.Fatalf("%s failed", testName)
 		}
 	}
 }
 
-func TestMongo_CreateGetManyWithSortingAndPaging(t *testing.T) {
-	name := "TestMongo_CreateGetManyWithSortingAndPaging"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateGetManyWithSortingAndPaging(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateGetManyWithSortingAndPaging"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
 
 	idList := make([]string, 0)
 	for i := 0; i < 10; i++ {
@@ -439,269 +432,267 @@ func TestMongo_CreateGetManyWithSortingAndPaging(t *testing.T) {
 	rand.Shuffle(len(idList), func(i, j int) { idList[i], idList[j] = idList[j], idList[i] })
 	for i := 0; i < 10; i++ {
 		ubo := NewUniversalBo(idList[i], uint64(i))
-		ubo.SetDataAttr("name.first", strconv.Itoa(i))
-		ubo.SetDataAttr("name.last", "Nguyen")
+		ubo.SetDataAttr("testName.first", strconv.Itoa(i))
+		ubo.SetDataAttr("testName.last", "Nguyen")
 		ubo.SetExtraAttr("email", idList[i]+"@mydomain.com")
 		ubo.SetExtraAttr("age", 35+i)
-		if ok, err := dao.Create(ubo); err != nil {
-			t.Fatalf("%s failed: %s", name, err)
+		if ok, err := testDao.Create(ubo); err != nil {
+			t.Fatalf("%s failed: %s", testName, err)
 		} else if !ok {
-			t.Fatalf("%s failed: cannot create record", name)
+			t.Fatalf("%s failed: cannot create record", testName)
 		}
 	}
 
 	fromOffset := 3
 	numRows := 4
 	sorting := (&godal.SortingField{FieldName: "email", Descending: true}).ToSortingOpt()
-	if boList, err := dao.GetN(fromOffset, numRows, nil, sorting); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if boList, err := testDao.GetN(fromOffset, numRows, nil, sorting); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if len(boList) != numRows {
-		t.Fatalf("%s failed: expected %#v items but received %#v", name, numRows, len(boList))
+		t.Fatalf("%s failed: expected %#v items but received %#v", testName, numRows, len(boList))
 	} else {
 		for i := 0; i < numRows; i++ {
 			if boList[i].GetId() != strconv.Itoa(9-i-fromOffset) {
-				t.Fatalf("%s failed: expected record %#v but received %#v", name, strconv.Itoa(9-i-fromOffset), boList[i].GetId())
+				t.Fatalf("%s failed: expected record %#v but received %#v", testName, strconv.Itoa(9-i-fromOffset), boList[i].GetId())
 			}
 		}
 	}
 }
 
-func TestMongo_Update(t *testing.T) {
-	name := "TestMongo_Update"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_Update(t *testing.T) {
+	testName := "TestUniversalDaoMongo_Update"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if _, err := dao.Create(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, err := testDao.Create(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 
-	ubo.SetDataAttr("name.first", "Thanh2")
-	ubo.SetDataAttr("name.last", "Nguyen2")
+	ubo.SetDataAttr("testName.first", "Thanh2")
+	ubo.SetDataAttr("testName.last", "Nguyen2")
 	ubo.SetExtraAttr("email", "thanh@mydomain.com")
 	ubo.SetExtraAttr("age", 37)
-	if ok, err := dao.Update(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Update(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot update record", name)
+		t.Fatalf("%s failed: cannot update record", testName)
 	}
 
-	if bo, err := dao.Get("id"); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if bo, err := testDao.Get("id"); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if bo == nil {
-		t.Fatalf("%s failed: not found", name)
+		t.Fatalf("%s failed: not found", testName)
 	} else {
 		if v := bo.GetTagVersion(); v != uint64(1357) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, uint64(1357), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, uint64(1357), v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString); v != "Thanh2" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Thanh2", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.first", reddo.TypeString); v != "Thanh2" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Thanh2", v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString); v != "Nguyen2" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Nguyen2", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.last", reddo.TypeString); v != "Nguyen2" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Nguyen2", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString); v != "thanh@mydomain.com" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "thanh@mydomain.com", v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "thanh@mydomain.com", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt); v != int64(37) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, int64(37), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, int64(37), v)
 		}
 	}
 }
 
-func TestMongo_UpdateNotExist(t *testing.T) {
-	name := "TestMongo_UpdateNotExist"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_UpdateNotExist(t *testing.T) {
+	testName := "TestUniversalDaoMongo_UpdateNotExist"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if ok, err := dao.Update(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, err := testDao.Update(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if ok {
-		t.Fatalf("%s failed: record should not be updated", name)
+		t.Fatalf("%s failed: record should not be updated", testName)
 	}
 }
 
-func TestMongo_UpdateDuplicated(t *testing.T) {
-	name := "TestMongo_UpdateDuplicated"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_UpdateDuplicated(t *testing.T) {
+	testName := "TestUniversalDaoMongo_UpdateDuplicated"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
 
 	ubo1 := NewUniversalBo("1", 1357)
-	ubo1.SetDataAttr("name.first", "Thanh")
-	ubo1.SetDataAttr("name.last", "Nguyen")
+	ubo1.SetDataAttr("testName.first", "Thanh")
+	ubo1.SetDataAttr("testName.last", "Nguyen")
 	ubo1.SetExtraAttr("email", "1@mydomain.com")
 	ubo1.SetExtraAttr("age", 35)
-	if _, err := dao.Create(ubo1); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, err := testDao.Create(ubo1); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 	ubo2 := NewUniversalBo("2", 1357)
-	ubo2.SetDataAttr("name.first", "Thanh2")
-	ubo2.SetDataAttr("name.last", "Nguyen2")
+	ubo2.SetDataAttr("testName.first", "Thanh2")
+	ubo2.SetDataAttr("testName.last", "Nguyen2")
 	ubo2.SetExtraAttr("email", "2@mydomain.com")
 	ubo2.SetExtraAttr("age", 35)
-	if _, err := dao.Create(ubo2); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, err := testDao.Create(ubo2); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, err := dao.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, err := testDao.Update(ubo1); err != godal.ErrGdaoDuplicatedEntry {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 }
 
-func TestMongo_SaveNew(t *testing.T) {
-	name := "TestMongo_SaveNew"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_SaveNew(t *testing.T) {
+	testName := "TestUniversalDaoMongo_SaveNew"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if ok, old, err := dao.Save(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, old, err := testDao.Save(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot save record", name)
+		t.Fatalf("%s failed: cannot save record", testName)
 	} else if old != nil {
-		t.Fatalf("%s failed: there should be no existing record", name)
+		t.Fatalf("%s failed: there should be no existing record", testName)
 	}
 
-	if bo, err := dao.Get("id"); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if bo, err := testDao.Get("id"); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if bo == nil {
-		t.Fatalf("%s failed: not found", name)
+		t.Fatalf("%s failed: not found", testName)
 	} else {
 		if v := bo.GetTagVersion(); v != uint64(1357) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, uint64(1357), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, uint64(1357), v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString); v != "Thanh" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Thanh", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.first", reddo.TypeString); v != "Thanh" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Thanh", v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString); v != "Nguyen" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Nguyen", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.last", reddo.TypeString); v != "Nguyen" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Nguyen", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString); v != "myname@mydomain.com" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "myname@mydomain.com", v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "myname@mydomain.com", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt); v != int64(35) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, int64(35), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, int64(35), v)
 		}
 	}
 }
 
-func TestMongo_SaveExisting(t *testing.T) {
-	name := "TestMongo_SaveExisting"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_SaveExisting(t *testing.T) {
+	testName := "TestUniversalDaoMongo_SaveExisting"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo := NewUniversalBo("id", 1357)
-	ubo.SetDataAttr("name.first", "Thanh")
-	ubo.SetDataAttr("name.last", "Nguyen")
+	ubo.SetDataAttr("testName.first", "Thanh")
+	ubo.SetDataAttr("testName.last", "Nguyen")
 	ubo.SetExtraAttr("email", "myname@mydomain.com")
 	ubo.SetExtraAttr("age", 35)
 
-	if _, err := dao.Create(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, err := testDao.Create(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 
-	ubo.SetDataAttr("name.first", "Thanh2")
-	ubo.SetDataAttr("name.last", "Nguyen2")
+	ubo.SetDataAttr("testName.first", "Thanh2")
+	ubo.SetDataAttr("testName.last", "Nguyen2")
 	ubo.SetExtraAttr("email", "thanh@mydomain.com")
 	ubo.SetExtraAttr("age", 37)
-	if ok, old, err := dao.Save(ubo); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if ok, old, err := testDao.Save(ubo); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot save record", name)
+		t.Fatalf("%s failed: cannot save record", testName)
 	} else if old == nil {
-		t.Fatalf("%s failed: there should be an existing record", name)
+		t.Fatalf("%s failed: there should be an existing record", testName)
 	} else {
 		if v := old.GetTagVersion(); v != uint64(1357) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, uint64(1357), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, uint64(1357), v)
 		}
-		if v := old.GetDataAttrAsUnsafe("name.first", reddo.TypeString); v != "Thanh" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Thanh", v)
+		if v := old.GetDataAttrAsUnsafe("testName.first", reddo.TypeString); v != "Thanh" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Thanh", v)
 		}
-		if v := old.GetDataAttrAsUnsafe("name.last", reddo.TypeString); v != "Nguyen" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Nguyen", v)
+		if v := old.GetDataAttrAsUnsafe("testName.last", reddo.TypeString); v != "Nguyen" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Nguyen", v)
 		}
 		if v := old.GetExtraAttrAsUnsafe("email", reddo.TypeString); v != "myname@mydomain.com" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "myname@mydomain.com", v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "myname@mydomain.com", v)
 		}
 		if v := old.GetExtraAttrAsUnsafe("age", reddo.TypeInt); v != int64(35) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, int64(35), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, int64(35), v)
 		}
 	}
 
-	if bo, err := dao.Get("id"); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if bo, err := testDao.Get("id"); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	} else if bo == nil {
-		t.Fatalf("%s failed: not found", name)
+		t.Fatalf("%s failed: not found", testName)
 	} else {
 		if v := bo.GetTagVersion(); v != uint64(1357) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, uint64(1357), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, uint64(1357), v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString); v != "Thanh2" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Thanh2", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.first", reddo.TypeString); v != "Thanh2" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Thanh2", v)
 		}
-		if v := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString); v != "Nguyen2" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "Nguyen2", v)
+		if v := bo.GetDataAttrAsUnsafe("testName.last", reddo.TypeString); v != "Nguyen2" {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "Nguyen2", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString); v != "thanh@mydomain.com" {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, "thanh@mydomain.com", v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, "thanh@mydomain.com", v)
 		}
 		if v := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt); v != int64(37) {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, int64(37), v)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, int64(37), v)
 		}
 	}
 }
 
-func TestMongo_SaveExistingUnique(t *testing.T) {
-	name := "TestMongo_SaveExistingUnique"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_SaveExistingUnique(t *testing.T) {
+	testName := "TestUniversalDaoMongo_SaveExistingUnique"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
+
 	ubo1 := NewUniversalBo("1", 1357)
-	ubo1.SetDataAttr("name.first", "Thanh1")
-	ubo1.SetDataAttr("name.last", "Nguyen1")
+	ubo1.SetDataAttr("testName.first", "Thanh1")
+	ubo1.SetDataAttr("testName.last", "Nguyen1")
 	ubo1.SetExtraAttr("email", "1@mydomain.com")
 	ubo1.SetExtraAttr("age", 35)
-	if _, err := dao.Create(ubo1); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, err := testDao.Create(ubo1); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 	ubo2 := NewUniversalBo("2", 1357)
-	ubo2.SetDataAttr("name.first", "Thanh2")
-	ubo2.SetDataAttr("name.last", "Nguyen2")
+	ubo2.SetDataAttr("testName.first", "Thanh2")
+	ubo2.SetDataAttr("testName.last", "Nguyen2")
 	ubo2.SetExtraAttr("email", "2@mydomain.com")
 	ubo2.SetExtraAttr("age", 37)
-	if _, err := dao.Create(ubo2); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, err := testDao.Create(ubo2); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 
 	ubo1.SetExtraAttr("email", "2@mydomain.com")
-	if _, _, err := dao.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
-		t.Fatalf("%s failed: %s", name, err)
+	if _, _, err := testDao.Save(ubo1); err != godal.ErrGdaoDuplicatedEntry {
+		t.Fatalf("%s failed: %s", testName, err)
 	}
 }
 
-func TestMongo_CreateUpdateGet_Checksum(t *testing.T) {
-	name := "TestMongo_CreateUpdateGet_Checksum"
-	collectionName := "table_temp"
-	mc, dao := _testMongoInit(t, name, collectionName)
-	defer mc.Close(nil)
+func TestUniversalDaoMongo_CreateUpdateGet_Checksum(t *testing.T) {
+	testName := "TestUniversalDaoMongo_CreateUpdateGet_Checksum"
+	teardownTest := setupTest(t, testName, setupTestMongo, teardownTestMongo)
+	defer teardownTest(t)
 
 	_tagVersion := uint64(1337)
 	_id := "admin@local"
@@ -713,160 +704,140 @@ func TestMongo_CreateUpdateGet_Checksum(t *testing.T) {
 	_Age := float64(35)
 	user0 := newUser(_tagVersion, _id, _maskId)
 	user0.SetPassword(_pwd).SetDisplayName(_displayName).SetAdmin(_isAdmin)
-	user0.SetDataAttr("name.first", "Thanh")
-	user0.SetDataAttr("name.last", "Nguyen")
+	user0.SetDataAttr("testName.first", "Thanh")
+	user0.SetDataAttr("testName.last", "Nguyen")
 	user0.SetExtraAttr("email", _Email)
 	user0.SetExtraAttr("age", _Age)
-	if ok, err := dao.Create(&(user0.sync().UniversalBo)); err != nil {
-		t.Fatalf("%s failed: %s", name+"/Create", err)
+	if ok, err := testDao.Create(&(user0.sync().UniversalBo)); err != nil {
+		t.Fatalf("%s failed: %s", testName+"/Create", err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot create record", name)
+		t.Fatalf("%s failed: cannot create record", testName)
 	}
-	if bo, err := dao.Get(_id); err != nil {
-		t.Fatalf("%s failed: %s", name+"/Get", err)
+	if bo, err := testDao.Get(_id); err != nil {
+		t.Fatalf("%s failed: %s", testName+"/Get", err)
 	} else if bo == nil {
-		t.Fatalf("%s failed: not found", name)
+		t.Fatalf("%s failed: not found", testName)
 	} else {
-		if v1, v0 := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := bo.GetDataAttrAsUnsafe("testName.first", reddo.TypeString), "Thanh"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
-		if v1, v0 := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := bo.GetDataAttrAsUnsafe("testName.last", reddo.TypeString), "Nguyen"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age); v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if bo.GetChecksum() != user0.GetChecksum() {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), bo.GetChecksum())
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, user0.GetChecksum(), bo.GetChecksum())
 		}
 
 		user1 := newUserFromUbo(bo)
-		if v1, v0 := user1.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := user1.GetDataAttrAsUnsafe("testName.first", reddo.TypeString), "Thanh"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
-		if v1, v0 := user1.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := user1.GetDataAttrAsUnsafe("testName.last", reddo.TypeString), "Nguyen"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age); v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetTagVersion(), _tagVersion; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetId(), _id; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetDisplayName(), _displayName; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetMaskId(), _maskId; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetPassword(), _pwd; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.IsAdmin(), _isAdmin; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if user1.GetChecksum() != user0.GetChecksum() {
-			// csumMap := map[string]interface{}{
-			// 	"id":          user1.id,
-			// 	"app_version": user1.tagVersion,
-			// 	"t_created":   user1.timeCreated.In(time.UTC).Format(TimeLayout),
-			// 	"data":        user1._data,
-			// 	"extra":       user1._extraAttrs,
-			// }
-			// csum := fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
-			// fmt.Printf("DEBUG: %s - %s / %s\n", user1.GetChecksum(), csum, csumMap)
-			//
-			// csumMap = map[string]interface{}{
-			// 	"id":          user0.id,
-			// 	"app_version": user0.tagVersion,
-			// 	"t_created":   user0.timeCreated.In(time.UTC).Format(TimeLayout),
-			// 	"data":        user0._data,
-			// 	"extra":       user0._extraAttrs,
-			// }
-			// csum = fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
-			// fmt.Printf("DEBUG: %s - %s / %s\n", user0.GetChecksum(), csum, csumMap)
-
-			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), user1.GetChecksum())
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, user0.GetChecksum(), user1.GetChecksum())
 		}
 	}
 
 	oldChecksum := user0.GetChecksum()
 	user0.SetMaskId(_maskId + "-new").SetPassword(_pwd + "-new").SetDisplayName(_displayName + "-new").SetAdmin(!_isAdmin).SetTagVersion(_tagVersion + 3)
-	user0.SetDataAttr("name.first", "Thanh2")
-	user0.SetDataAttr("name.last", "Nguyen2")
+	user0.SetDataAttr("testName.first", "Thanh2")
+	user0.SetDataAttr("testName.last", "Nguyen2")
 	user0.SetExtraAttr("email", _Email+"-new")
 	user0.SetExtraAttr("age", _Age+2)
-	if ok, err := dao.Update(&(user0.sync().UniversalBo)); err != nil {
-		t.Fatalf("%s failed: %s", name+"/Update", err)
+	if ok, err := testDao.Update(&(user0.sync().UniversalBo)); err != nil {
+		t.Fatalf("%s failed: %s", testName+"/Update", err)
 	} else if !ok {
-		t.Fatalf("%s failed: cannot update record", name)
+		t.Fatalf("%s failed: cannot update record", testName)
 	}
-	if bo, err := dao.Get(_id); err != nil {
-		t.Fatalf("%s failed: %s", name+"/Get", err)
+	if bo, err := testDao.Get(_id); err != nil {
+		t.Fatalf("%s failed: %s", testName+"/Get", err)
 	} else if bo == nil {
-		t.Fatalf("%s failed: not found", name)
+		t.Fatalf("%s failed: not found", testName)
 	} else {
-		if v1, v0 := bo.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh2"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := bo.GetDataAttrAsUnsafe("testName.first", reddo.TypeString), "Thanh2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
-		if v1, v0 := bo.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := bo.GetDataAttrAsUnsafe("testName.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := bo.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email+"-new"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := bo.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age+2); v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if bo.GetChecksum() != user0.GetChecksum() {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), bo.GetChecksum())
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, user0.GetChecksum(), bo.GetChecksum())
 		}
 
 		user1 := newUserFromUbo(bo)
-		if v1, v0 := user1.GetDataAttrAsUnsafe("name.first", reddo.TypeString), "Thanh2"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := user1.GetDataAttrAsUnsafe("testName.first", reddo.TypeString), "Thanh2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
-		if v1, v0 := user1.GetDataAttrAsUnsafe("name.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+		if v1, v0 := user1.GetDataAttrAsUnsafe("testName.last", reddo.TypeString), "Nguyen2"; v1 != v0 {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetExtraAttrAsUnsafe("email", reddo.TypeString), _Email+"-new"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetExtraAttrAsUnsafe("age", reddo.TypeInt), int64(_Age+2); v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetTagVersion(), _tagVersion+3; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetId(), _id; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetDisplayName(), _displayName+"-new"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetMaskId(), _maskId+"-new"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.GetPassword(), _pwd+"-new"; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if v1, v0 := user1.IsAdmin(), !_isAdmin; v1 != v0 {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, v0, v1)
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if user1.GetChecksum() != user0.GetChecksum() {
-			t.Fatalf("%s failed: expected %#v but received %#v", name, user0.GetChecksum(), user1.GetChecksum())
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, user0.GetChecksum(), user1.GetChecksum())
 		}
 		if user1.GetChecksum() == oldChecksum {
-			t.Fatalf("%s failed: checksum must not be %#v", name, oldChecksum)
+			t.Fatalf("%s failed: checksum must not be %#v", testName, oldChecksum)
 		}
 	}
 }
