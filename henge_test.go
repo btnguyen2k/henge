@@ -283,36 +283,42 @@ func Test_cloneSlice(t *testing.T) {
 
 func TestNewUniversalBo(t *testing.T) {
 	name := "TestNewUniversalBo"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	if ubo == nil {
 		t.Fatalf("%s failed: nil", name)
 	}
-	if id := ubo.GetId(); id != "id" {
-		t.Fatalf("%s failed: expected bo's id to be %#v but received %#v", name, "id", id)
+	if vE, vA := _id, ubo.GetId(); vE != vA {
+		t.Fatalf("%s failed: expected bo's id to be %#v but received %#v", name, vE, vA)
 	}
-	if appVersion := ubo.GetTagVersion(); appVersion != 1357 {
-		t.Fatalf("%s failed: expected bo's id to be %#v but received %#v", name, 1357, appVersion)
+	if vE, vA := _tagVersion, ubo.GetTagVersion(); vE != vA {
+		t.Fatalf("%s failed: expected bo's tag-version to be %#v but received %#v", name, vE, vA)
 	}
 }
 
 func TestUniversalBo_ToMap(t *testing.T) {
 	name := "TestUniversalBo_ToMap"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	m := ubo.ToMap(nil, nil)
 	if m == nil {
 		t.Fatalf("%s failed: nil", name)
 	}
-	if m[FieldId] != "id" {
-		t.Fatalf("%s failed: expected field %s has value %#v but received %#v", name, FieldId, "id", m[FieldId])
+	if m[FieldId] != _id {
+		t.Fatalf("%s failed: expected field %s has value %#v but received %#v", name, FieldId, _id, m[FieldId])
 	}
-	if m[FieldTagVersion] != uint64(1357) {
-		t.Fatalf("%s failed: expected field %s has value %#v but received %#v", name, FieldTagVersion, 1357, m[FieldTagVersion])
+	if m[FieldTagVersion] != _tagVersion {
+		t.Fatalf("%s failed: expected field %s has value %#v but received %#v", name, FieldTagVersion, _tagVersion, m[FieldTagVersion])
 	}
 }
 
 func TestUniversalBo_datatypes(t *testing.T) {
 	name := "TestUniversalBo_datatypes"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	vInt := 123
 	ubo.SetDataAttr("data.number[0]", vInt)
 	vFloat := 45.6
@@ -364,7 +370,9 @@ func TestUniversalBo_datatypes(t *testing.T) {
 
 func TestUniversalBo_json(t *testing.T) {
 	name := "TestUniversalBo_json"
-	ubo1 := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo1 := NewUniversalBo(_id, _tagVersion)
 	vInt := float64(123)
 	ubo1.SetDataAttr("data.number[0]", vInt)
 	vFloat := 45.6
@@ -400,7 +408,9 @@ func TestUniversalBo_json(t *testing.T) {
 
 func TestUniversalBo_SetId(t *testing.T) {
 	name := "TestUniversalBo_json"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	id := "  This IS an Id  "
 	ubo.SetId(id)
 	id = strings.TrimSpace(id)
@@ -411,7 +421,9 @@ func TestUniversalBo_SetId(t *testing.T) {
 
 func TestUniversalBo_SetDataJson(t *testing.T) {
 	name := "TestUniversalBo_SetDataJson"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	jsonData := `{"a":"a string","b":1,"c":true}`
 	ubo.SetDataJson(jsonData)
 	if ubo.GetDataJson() != jsonData {
@@ -421,7 +433,9 @@ func TestUniversalBo_SetDataJson(t *testing.T) {
 
 func TestUniversalBo_SetTagVersion(t *testing.T) {
 	name := "TestUniversalBo_SetTagVersion"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	ubo.SetTagVersion(1234)
 	if ubo.GetTagVersion() != uint64(1234) {
 		t.Fatalf("%s failed: expected %#v but received %#v", name, 1234, ubo.GetTagVersion())
@@ -431,7 +445,9 @@ func TestUniversalBo_SetTagVersion(t *testing.T) {
 func TestUniversalBo_GetTimeCreated(t *testing.T) {
 	name := "TestUniversalBo_GetTimeCreated"
 	now := time.Now()
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	if d := ubo.GetTimeCreated().Nanosecond() - now.Nanosecond(); d > 10000 {
 		t.Fatalf("%s failed: expected delta less than %#v but received %#v", name, 10000, d)
 	}
@@ -439,7 +455,9 @@ func TestUniversalBo_GetTimeCreated(t *testing.T) {
 
 func TestUniversalBo_SetTimeUpdated(t *testing.T) {
 	name := "TestUniversalBo_SetTimeUpdated"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	tupdate := time.Now().Add(5 * time.Minute)
 	ubo.SetTimeUpdated(tupdate)
 	if ubo.GetTimeUpdated().Nanosecond() != tupdate.Nanosecond() {
@@ -449,7 +467,9 @@ func TestUniversalBo_SetTimeUpdated(t *testing.T) {
 
 func TestUniversalBo_SetExtraAttr(t *testing.T) {
 	name := "TestUniversalBo_SetExtraAttr"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	now := time.Now()
 	ubo.SetExtraAttr("str", "a string")
 	ubo.SetExtraAttr("int", 123)
@@ -494,7 +514,9 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 
 func TestUniversalBo_SetDataAttr(t *testing.T) {
 	name := "TestUniversalBo_SetDataAttr"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	now := time.Now()
 	ubo.SetDataAttr("s.t.r.str", "a string")
 	ubo.SetDataAttr("i[0].int", 123)
@@ -540,7 +562,9 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 
 func TestUniversalBo_Checksum(t *testing.T) {
 	name := "TestUniversalBo_Checksum"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	checksum1 := ubo.GetChecksum()
 	ubo.SetDataAttr("str", "a string")
 	if !ubo.IsDirty() {
@@ -558,7 +582,9 @@ func TestUniversalBo_Checksum(t *testing.T) {
 
 func TestUniversalBo_Checksum2(t *testing.T) {
 	name := "TestUniversalBo_Checksum2"
-	ubo := NewUniversalBo("id", 1357)
+	_id := "id"
+	_tagVersion := uint64(1357)
+	ubo := NewUniversalBo(_id, _tagVersion)
 	checksum1 := ubo.GetChecksum()
 	ubo.SetExtraAttr("str", "a string")
 	if !ubo.IsDirty() {
