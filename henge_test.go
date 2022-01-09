@@ -2,6 +2,7 @@ package henge
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -298,111 +299,226 @@ func TestNewUniversalBo(t *testing.T) {
 }
 
 func TestUniversalBo_ToMap(t *testing.T) {
-	name := "TestUniversalBo_ToMap"
+	testName := "TestUniversalBo_ToMap"
 	_id := "id"
 	_tagVersion := uint64(1357)
-	ubo := NewUniversalBo(_id, _tagVersion)
-	m := ubo.ToMap(nil, nil)
-	if m == nil {
-		t.Fatalf("%s failed: nil", name)
-	}
-	if m[FieldId] != _id {
-		t.Fatalf("%s failed: expected field %s has value %#v but received %#v", name, FieldId, _id, m[FieldId])
-	}
-	if m[FieldTagVersion] != _tagVersion {
-		t.Fatalf("%s failed: expected field %s has value %#v but received %#v", name, FieldTagVersion, _tagVersion, m[FieldTagVersion])
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	vStr := "a string"
+	vInt := 123
+	vFloat := 4.56
+	vBool := true
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			now := time.Now()
+			ubo := NewUniversalBo(_id, _tagVersion, UboOpt{TimestampRounding: roundingOpt})
+			ubo.SetDataAttr("key", "value")
+			ubo.SetExtraAttr("str", vStr)
+			ubo.SetExtraAttr("int", vInt)
+			ubo.SetExtraAttr("float", vFloat)
+			ubo.SetExtraAttr("bool", vBool)
+			ubo.SetExtraAttr("t", now)
+			ubo.Sync()
+			next := now.Add(1024 * time.Millisecond)
+			ubo.SetTimeUpdated(next)
+			m := ubo.ToMap(nil, nil)
+			if m == nil {
+				t.Fatalf("%s failed: nil", testName)
+			}
+			if m[FieldId] != _id {
+				t.Fatalf("%s failed: expected field %s has value %#v but received %#v", testName, FieldId, _id, m[FieldId])
+			}
+			if m[FieldTagVersion] != _tagVersion {
+				t.Fatalf("%s failed: expected field %s has value %#v but received %#v", testName, FieldTagVersion, _tagVersion, m[FieldTagVersion])
+			}
+			if m[FieldData] != `{"key":"value"}` {
+				t.Fatalf("%s failed: expected field %s has value %#v but received %#v", testName, FieldData, `{"key":"value"}`, m[FieldData])
+			}
+			if d := m[FieldTimeCreated].(time.Time).Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", testName, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+			if d := m[FieldTimeUpdated].(time.Time).Nanosecond() - next.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", testName, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+
+			mext, ok := m[FieldExtras].(map[string]interface{})
+			if mext == nil || !ok {
+				t.Fatalf("%s failed: invalid value for field %s", testName, FieldExtras)
+			}
+			if mext["str"] != vStr {
+				t.Fatalf("%s failed: expected field %s has value %#v but received %#v", testName, FieldExtras+".str", vStr, mext["str"])
+			}
+			if mext["int"] != vInt {
+				t.Fatalf("%s failed: expected field %s has value %#v but received %#v", testName, FieldExtras+".int", vInt, mext["int"])
+			}
+			if mext["float"] != vFloat {
+				t.Fatalf("%s failed: expected field %s has value %#v but received %#v", testName, FieldExtras+".float", vFloat, mext["float"])
+			}
+			if mext["bool"] != vBool {
+				t.Fatalf("%s failed: expected field %s has value %#v but received %#v", testName, FieldExtras+".bool", vBool, mext["bool"])
+			}
+			if d := mext["t"].(time.Time).Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", testName, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+		})
 	}
 }
 
 func TestUniversalBo_datatypes(t *testing.T) {
-	name := "TestUniversalBo_datatypes"
+	testName := "TestUniversalBo_datatypes"
 	_id := "id"
 	_tagVersion := uint64(1357)
-	ubo := NewUniversalBo(_id, _tagVersion)
-	vInt := 123
-	ubo.SetDataAttr("data.number[0]", vInt)
-	vFloat := 45.6
-	ubo.SetDataAttr("data.number[1]", vFloat)
-	vBool := true
-	ubo.SetDataAttr("data.bool", vBool)
-	vString := "a string"
-	ubo.SetDataAttr("data.string", vString)
-	vTime := time.Now()
-	ubo.SetDataAttr("data.time[0]", vTime)
-	ubo.SetDataAttr("data.time[1]", vTime.Format(ubo._timeLayout))
+	fieldNameList := []string{"data.number[0]", "data.number[1]", "data.number[2]", "data.bool", "data.string"}
+	fieldValueList := []interface{}{int64(123), uint64(456), float64(12.56), true, "a string"}
+	fieldTypeList := []reflect.Type{reddo.TypeInt, reddo.TypeUint, reddo.TypeFloat, reddo.TypeBool, reddo.TypeString}
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			ubo := NewUniversalBo(_id, _tagVersion, UboOpt{TimestampRounding: roundingOpt})
+			for i, field := range fieldNameList {
+				ubo.SetDataAttr(field, fieldValueList[i])
+			}
+			now := time.Now()
+			ubo.SetDataAttr("data.time", now)
 
-	if v, err := ubo.GetDataAttrAs("data.number[0]", reddo.TypeInt); err != nil {
-		t.Fatalf("%s failed: %#e", name, err)
-	} else if v != int64(vInt) {
-		t.Fatalf("%s failed [int]: expected %#v but received %#v", name, vInt, v)
-	}
-	if v, err := ubo.GetDataAttrAs("data.number[0]", reddo.TypeUint); err != nil {
-		t.Fatalf("%s failed: %#e", name, err)
-	} else if v != uint64(vInt) {
-		t.Fatalf("%s failed [uint]: expected %#v but received %#v", name, vInt, v)
-	}
-	if v, err := ubo.GetDataAttrAs("data.number[1]", reddo.TypeFloat); err != nil {
-		t.Fatalf("%s failed: %#e", name, err)
-	} else if v != float64(vFloat) {
-		t.Fatalf("%s failed [float]: expected %#v but received %#v", name, vFloat, v)
-	}
-	if v, err := ubo.GetDataAttrAs("data.bool", reddo.TypeBool); err != nil {
-		t.Fatalf("%s failed: %#e", name, err)
-	} else if v != vBool {
-		t.Fatalf("%s failed [bool]: expected %#v but received %#v", name, vBool, v)
-	}
-	if v, err := ubo.GetDataAttrAs("data.string", reddo.TypeString); err != nil {
-		t.Fatalf("%s failed: %#e", name, err)
-	} else if v != vString {
-		t.Fatalf("%s failed [string]: expected %#v but received %#v", name, vString, v)
-	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("data.time[0]", ubo._timeLayout); err != nil {
-		t.Fatalf("%s failed: %#e", name, err)
-	} else if v.Format(ubo._timeLayout) != vTime.Format(ubo._timeLayout) {
-		t.Fatalf("%s failed [time]: expected %#v but received %#v", name, vTime, v)
-	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("data.time[1]", ubo._timeLayout); err != nil {
-		t.Fatalf("%s failed: %#e", name, err)
-	} else if v.Format(ubo._timeLayout) != vTime.Format(ubo._timeLayout) {
-		t.Fatalf("%s failed [time]: expected %#v but received %#v", name, vTime, v)
+			for i, field := range fieldNameList {
+				if v, err := ubo.GetDataAttrAs(field, fieldTypeList[i]); err != nil {
+					t.Fatalf("%s failed: %#e", testName, err)
+				} else if v != fieldValueList[i] {
+					t.Fatalf("%s failed [field %s]: expected %#v but received %#v", testName, field, fieldValueList[i], v)
+				}
+
+				if v := ubo.GetDataAttrAsUnsafe(field, fieldTypeList[i]); v == nil {
+					t.Fatalf("%s failed: nil", testName)
+				} else if v != fieldValueList[i] {
+					t.Fatalf("%s failed [field %s]: expected %#v but received %#v", testName, field, fieldValueList[i], v)
+				}
+			}
+
+			if v, err := ubo.GetDataAttrAsTimeWithLayout("data.time", DefaultTimeLayout); err != nil {
+				t.Fatalf("%s failed: %#e", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", testName, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+
+			v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("data.time", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", testName, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+		})
 	}
 }
 
 func TestUniversalBo_json(t *testing.T) {
-	name := "TestUniversalBo_json"
+	testName := "TestUniversalBo_json"
 	_id := "id"
 	_tagVersion := uint64(1357)
-	ubo1 := NewUniversalBo(_id, _tagVersion)
-	vInt := float64(123)
-	ubo1.SetDataAttr("data.number[0]", vInt)
-	vFloat := 45.6
-	ubo1.SetDataAttr("data.number[1]", vFloat)
-	vBool := true
-	ubo1.SetDataAttr("data.bool", vBool)
-	vString := "a string"
-	ubo1.SetDataAttr("data.string", vString)
-	vTime := time.Now()
-	ubo1.SetDataAttr("data.time[0]", vTime.Format(ubo1._timeLayout))
-	ubo1.SetDataAttr("data.time[1]", vTime.Format(ubo1._timeLayout))
-	js1, _ := json.Marshal(ubo1)
+	fieldNameList := []string{"data.number[0]", "data.number[1]", "data.number[2]", "data.bool", "data.string"}
+	fieldValueList := []interface{}{int64(123), uint64(456), float64(12.56), true, "a string"}
+	fieldTypeList := []reflect.Type{reddo.TypeInt, reddo.TypeUint, reddo.TypeFloat, reddo.TypeBool, reddo.TypeString}
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	timeLayoutList := []string{"2006-01-02T15:04:05.999999999Z07:00", "2006-01-02T15:04:05.999999999Z07:00", "2006-01-02T15:04:05.999999Z07:00", "2006-01-02T15:04:05.999Z07:00", "2006-01-02T15:04:05Z07:00"}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			ubo1 := NewUniversalBo(_id, _tagVersion, UboOpt{TimestampRounding: roundingOpt})
+			for i, field := range fieldNameList {
+				v := fieldValueList[i]
+				switch v.(type) {
+				case int:
+					v = float64(v.(int))
+				case int8:
+					v = float64(v.(int8))
+				case int16:
+					v = float64(v.(int16))
+				case int32:
+					v = float64(v.(int32))
+				case int64:
+					v = float64(v.(int64))
+				case uint:
+					v = float64(v.(uint))
+				case uint8:
+					v = float64(v.(uint8))
+				case uint16:
+					v = float64(v.(uint16))
+				case uint32:
+					v = float64(v.(uint32))
+				case uint64:
+					v = float64(v.(uint64))
+				case float32:
+					v = float64(v.(float32))
+				}
+				ubo1.SetDataAttr(field, v)
+			}
+			now := time.Now()
+			ubo1.SetDataAttr("data.time[0]", now)
+			ubo1.SetDataAttr("data.time[1]", now.Format(time.RFC3339Nano))
 
-	ubo2 := &UniversalBo{_timeLayout: ubo1._timeLayout, _timestampRounding: ubo1._timestampRounding}
-	err := json.Unmarshal(js1, &ubo2)
-	if err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	}
+			js1, _ := json.Marshal(ubo1)
+			ubo2 := &UniversalBo{ /*_timeLayout: ubo1._timeLayout,*/ _timestampRounding: ubo1._timestampRounding}
+			err := json.Unmarshal(js1, &ubo2)
+			if err != nil {
+				t.Fatalf("%s failed: %s", testName, err)
+			}
 
-	if ubo1.id != ubo2.id {
-		t.Fatalf("%s failed [id]: expected %#v but received %#v", name, ubo1.id, ubo2.id)
-	}
-	if ubo1.tagVersion != ubo2.tagVersion {
-		t.Fatalf("%s failed [appversion]: expected %#v but received %#v", name, ubo1.tagVersion, ubo2.tagVersion)
-	}
-	if !reflect.DeepEqual(ubo1._data, ubo2._data) {
-		t.Fatalf("%s failed [data]: expected\n%#v\nbut received\n%#v", name, ubo1._data, ubo2._data)
-	}
-	if ubo1.checksum != ubo2.checksum {
-		t.Fatalf("%s failed [checksum]: expected %#v but received %#v", name, ubo1.checksum, ubo2.checksum)
+			if ubo2.id != _id {
+				t.Fatalf("%s failed [id]: expected %#v but received %#v", testName, _id, ubo2.id)
+			}
+			if ubo2.tagVersion != _tagVersion {
+				t.Fatalf("%s failed [appversion]: expected %#v but received %#v", testName, _tagVersion, ubo2.tagVersion)
+			}
+
+			for i, field := range fieldNameList {
+				if v, err := ubo2.GetDataAttrAs(field, fieldTypeList[i]); err != nil {
+					t.Fatalf("%s failed: %#e", testName, err)
+				} else if v != fieldValueList[i] {
+					t.Fatalf("%s failed [field %s]: expected %#v but received %#v", testName, field, fieldValueList[i], v)
+				}
+
+				if v := ubo2.GetDataAttrAsUnsafe(field, fieldTypeList[i]); v == nil {
+					t.Fatalf("%s failed: nil", testName)
+				} else if v != fieldValueList[i] {
+					t.Fatalf("%s failed [field %s]: expected %#v but received %#v", testName, field, fieldValueList[i], v)
+				}
+			}
+
+			// if v := ubo2.GetDataAttrUnsafe("data.time[0]"); true {
+			// 	fmt.Printf("%T: %#v\n", v, v)
+			// }
+			// if v := ubo2.GetDataAttrUnsafe("data.time[1]"); true {
+			// 	fmt.Printf("%T: %#v\n", v, v)
+			// }
+
+			if v, err := ubo2.GetDataAttrAsTimeWithLayout("data.time[0]", timeLayoutList[i]); err != nil {
+				t.Fatalf("%s failed: %#e", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", testName, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+			v := ubo2.GetDataAttrAsTimeWithLayoutUnsafe("data.time[0]", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", testName, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+
+			if !reflect.DeepEqual(ubo1._data, ubo2._data) {
+				// fmt.Printf("(%T) %#v / (%T) %#v / (%T) %#v\n",
+				// 	ubo1.GetDataAttrUnsafe("data.number[0]"), ubo1.GetDataAttrUnsafe("data.number[0]"),
+				// 	ubo1.GetDataAttrUnsafe("data.number[1]"), ubo1.GetDataAttrUnsafe("data.number[1]"),
+				// 	ubo1.GetDataAttrUnsafe("data.number[2]"), ubo1.GetDataAttrUnsafe("data.number[2]"))
+				// fmt.Printf("(%T) %#v / (%T) %#v / (%T) %#v\n",
+				// 	ubo2.GetDataAttrUnsafe("data.number[0]"), ubo2.GetDataAttrUnsafe("data.number[0]"),
+				// 	ubo2.GetDataAttrUnsafe("data.number[1]"), ubo2.GetDataAttrUnsafe("data.number[1]"),
+				// 	ubo2.GetDataAttrUnsafe("data.number[2]"), ubo2.GetDataAttrUnsafe("data.number[2]"))
+
+				t.Fatalf("%s failed [data]: expected\n%#v\nbut received\n%#v", testName, ubo1._data, ubo2._data)
+			}
+			if ubo1.checksum != ubo2.checksum {
+				t.Fatalf("%s failed [checksum]: expected %#v but received %#v", testName, ubo1.checksum, ubo2.checksum)
+			}
+		})
 	}
 }
 
@@ -442,121 +558,269 @@ func TestUniversalBo_SetTagVersion(t *testing.T) {
 	}
 }
 
-func TestUniversalBo_GetTimeCreated(t *testing.T) {
-	name := "TestUniversalBo_GetTimeCreated"
-	now := time.Now()
-	_id := "id"
-	_tagVersion := uint64(1357)
-	ubo := NewUniversalBo(_id, _tagVersion)
-	if d := ubo.GetTimeCreated().Nanosecond() - now.Nanosecond(); d > 10000 {
-		t.Fatalf("%s failed: expected delta less than %#v but received %#v", name, 10000, d)
+func TestUniversalBo_GetTimeCreated_rounding(t *testing.T) {
+	name := "TestUniversalBo_GetTimeCreated_rounding"
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			now := time.Now()
+			_id := "id"
+			_tagVersion := uint64(1357)
+			ubo := NewUniversalBo(_id, _tagVersion, UboOpt{TimestampRounding: roundingOpt})
+			if d := ubo.GetTimeCreated().Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", name, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+		})
 	}
 }
 
-func TestUniversalBo_SetTimeUpdated(t *testing.T) {
-	name := "TestUniversalBo_SetTimeUpdated"
-	_id := "id"
-	_tagVersion := uint64(1357)
-	ubo := NewUniversalBo(_id, _tagVersion)
-	tupdate := time.Now().Add(5 * time.Minute)
-	ubo.SetTimeUpdated(tupdate)
-	if ubo.GetTimeUpdated().Nanosecond() != tupdate.Nanosecond() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, tupdate.Nanosecond(), ubo.GetTimeUpdated().Nanosecond())
+func TestUniversalBo_SetTimeUpdated_rounding(t *testing.T) {
+	name := "TestUniversalBo_SetTimeUpdated_rounding"
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			_id := "id"
+			_tagVersion := uint64(1357)
+			ubo := NewUniversalBo(_id, _tagVersion, UboOpt{TimestampRounding: roundingOpt})
+			tupdate := time.Now().Add(5 * time.Minute)
+			ubo.SetTimeUpdated(tupdate)
+			if d := ubo.GetTimeUpdated().Nanosecond() - tupdate.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: expected delta between {%v - %v} but received %v", name, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], d)
+			}
+		})
+	}
+}
+
+func TestUniversalBo_SetGet_rounding(t *testing.T) {
+	name := "TestUniversalBo_SetGet_rounding"
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			_id := "id"
+			_tagVersion := uint64(1357)
+			ubo := NewUniversalBo(_id, _tagVersion)
+
+			ubo.SetTimestampRounding(roundingOpt)
+			if timeRounding := ubo.GetTimestampRounding(); timeRounding != roundingOpt {
+				t.Fatalf("%s failed: expected time-rounding %#v but received %#v", name, roundingOpt, timeRounding)
+			}
+
+			t1 := time.Now()
+			ubo.SetDataAttr("t1", t1)
+			ubo.SetExtraAttr("t1", t1)
+			v1 := ubo.GetDataAttrAsTimeWithLayoutUnsafe("t1", DefaultTimeLayout)
+			if d := v1.Nanosecond() - t1.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", name, t1, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v1, d)
+			}
+			v1 = ubo.GetExtraAttrAsTimeWithLayoutUnsafe("t1", DefaultTimeLayout)
+			if d := v1.Nanosecond() - t1.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", name, t1, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v1, d)
+			}
+
+			t2 := t1.Add(102 * time.Second)
+			ubo.SetDataAttr("t2", t2)
+			ubo.SetExtraAttr("t2", t2)
+			v2 := ubo.GetDataAttrAsTimeWithLayoutUnsafe("t2", DefaultTimeLayout)
+			if d := v2.Nanosecond() - t2.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", name, t2, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v2, d)
+			}
+			v2 = ubo.GetExtraAttrAsTimeWithLayoutUnsafe("t2", DefaultTimeLayout)
+			if d := v2.Nanosecond() - t2.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", name, t2, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v2, d)
+			}
+		})
 	}
 }
 
 func TestUniversalBo_SetExtraAttr(t *testing.T) {
-	name := "TestUniversalBo_SetExtraAttr"
+	testName := "TestUniversalBo_SetExtraAttr"
 	_id := "id"
 	_tagVersion := uint64(1357)
+	fieldNameList := []string{"str", "int", "uint", "float", "bool"}
+	fieldTypeList := []reflect.Type{reddo.TypeString, reddo.TypeInt, reddo.TypeUint, reddo.TypeFloat, reddo.TypeBool}
+	fieldValueList := []interface{}{"a string", int64(123), uint64(456), float64(12.56), true}
 	ubo := NewUniversalBo(_id, _tagVersion)
-	now := time.Now()
-	ubo.SetExtraAttr("str", "a string")
-	ubo.SetExtraAttr("int", 123)
-	ubo.SetExtraAttr("b", true)
-	ubo.SetExtraAttr("dstr", now.Format(ubo._timeLayout))
-	ubo.SetExtraAttr("d", &now)
-	fields := []string{"str", "int", "b", "dstr", "d"}
+	for i, f := range fieldNameList {
+		ubo.SetExtraAttr(f, fieldValueList[i])
+	}
+
 	m := ubo.GetExtraAttrs()
-	for _, f := range fields {
-		if _, ok := m[f]; !ok {
-			t.Fatalf("%s failed: field %s does not exist", name, f)
+	for i, f := range fieldNameList {
+		if v, ok := m[f]; !ok {
+			t.Fatalf("%s failed: field %s does not exist", testName, f)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
 		}
-		if ubo.GetExtraAttr(f) == nil {
-			t.Fatalf("%s failed: field %s does not exist", name, f)
+
+		if v := ubo.GetExtraAttr(f); v == nil {
+			t.Fatalf("%s failed: field %s does not exist", testName, f)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
 		}
+
+		if v, err := ubo.GetExtraAttrAs(f, fieldTypeList[i]); err != nil {
+			t.Fatalf("%s failed: %s", testName, err)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
+		}
+
+		if v := ubo.GetExtraAttrAsUnsafe(f, fieldTypeList[i]); v == nil {
+			t.Fatalf("%s failed: field %s does not exist", testName, f)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
+		}
+
+		delete(m, f)
 	}
-	if v, err := ubo.GetExtraAttrAs("str", reddo.TypeString); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	} else if v != "a string" {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, "a string", v)
+	if len(m) > 0 {
+		t.Fatalf("%s failed: there are unexpected extra fields %#v", testName, m)
 	}
-	if v := ubo.GetExtraAttrAsUnsafe("int", reddo.TypeInt); v != int64(123) {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, 123, v)
-	}
-	if v, err := ubo.GetExtraAttrAsTimeWithLayout("d", ubo._timeLayout); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(ubo._timeLayout), v.Format(ubo._timeLayout))
-	}
-	if v, err := ubo.GetExtraAttrAsTimeWithLayout("dstr", ubo._timeLayout); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
-	}
-	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("d", ubo._timeLayout); v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
-	}
-	if v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("dstr", ubo._timeLayout); v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
+}
+
+func TestUniversalBo_SetExtraAttr_time(t *testing.T) {
+	testName := "TestUniversalBo_SetExtraAttr_time"
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			_id := "id"
+			_tagVersion := uint64(1357)
+			ubo := NewUniversalBo(_id, _tagVersion, UboOpt{TimestampRounding: roundingOpt})
+			now := time.Now()
+			ubo.SetExtraAttr("tstr", now.Format(time.RFC3339Nano))
+			ubo.SetExtraAttr("t", now)
+			ubo.SetExtraAttr("tp", &now)
+
+			if v, err := ubo.GetExtraAttrAsTimeWithLayout("tstr", DefaultTimeLayout); err != nil {
+				t.Fatalf("%s failed: %s", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			if v, err := ubo.GetExtraAttrAsTimeWithLayout("t", DefaultTimeLayout); err != nil {
+				t.Fatalf("%s failed: %s", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			if v, err := ubo.GetExtraAttrAsTimeWithLayout("tp", DefaultTimeLayout); err != nil {
+				t.Fatalf("%s failed: %s", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			v := ubo.GetExtraAttrAsTimeWithLayoutUnsafe("tstr", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			v = ubo.GetExtraAttrAsTimeWithLayoutUnsafe("t", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			v = ubo.GetExtraAttrAsTimeWithLayoutUnsafe("tp", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+		})
 	}
 }
 
 func TestUniversalBo_SetDataAttr(t *testing.T) {
-	name := "TestUniversalBo_SetDataAttr"
+	testName := "TestUniversalBo_SetDataAttr"
 	_id := "id"
 	_tagVersion := uint64(1357)
+	fieldNameList := []string{"str", "v[0].int", "v[1].uint", "r.e.a.l.float", "v[0].bool"}
+	fieldTypeList := []reflect.Type{reddo.TypeString, reddo.TypeInt, reddo.TypeUint, reddo.TypeFloat, reddo.TypeBool}
+	fieldValueList := []interface{}{"a string", int64(123), uint64(456), float64(12.56), true}
 	ubo := NewUniversalBo(_id, _tagVersion)
-	now := time.Now()
-	ubo.SetDataAttr("s.t.r.str", "a string")
-	ubo.SetDataAttr("i[0].int", 123)
-	ubo.SetDataAttr("b", true)
-	ubo.SetDataAttr("time[0]", now.Format(ubo._timeLayout))
-	ubo.SetDataAttr("time[1]", &now)
-	fields := []string{"s.t.r.str", "i[0].int", "b", "time[0]", "time[1]"}
-	for _, f := range fields {
+	for i, f := range fieldNameList {
+		ubo.SetDataAttr(f, fieldValueList[i])
+	}
+
+	for i, f := range fieldNameList {
 		if v, err := ubo.GetDataAttr(f); err != nil {
-			t.Fatalf("%s failed: %s", name, err)
-		} else if v == nil {
-			t.Fatalf("%s failed: path %s does not exist", name, f)
+			t.Fatalf("%s failed: %s", testName, err)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
 		}
-		if ubo.GetDataAttrUnsafe(f) == nil {
-			t.Fatalf("%s failed: path %s does not exist", name, f)
+
+		if v := ubo.GetDataAttrUnsafe(f); v == nil {
+			t.Fatalf("%s failed: field %s does not exist", testName, f)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
+		}
+
+		if v, err := ubo.GetDataAttrAs(f, fieldTypeList[i]); err != nil {
+			t.Fatalf("%s failed: %s", testName, err)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
+		}
+
+		if v := ubo.GetDataAttrAsUnsafe(f, fieldTypeList[i]); v == nil {
+			t.Fatalf("%s failed: field %s does not exist", testName, f)
+		} else if v != fieldValueList[i] {
+			t.Fatalf("%s failed: expected %#v but received %#v", testName, fieldValueList[i], v)
 		}
 	}
-	if v, err := ubo.GetDataAttrAs("s.t.r.str", reddo.TypeString); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	} else if v != "a string" {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, "a string", v)
-	}
-	if v := ubo.GetDataAttrAsUnsafe("i[0].int", reddo.TypeInt); v != int64(123) {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, 123, v)
-	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[0]", ubo._timeLayout); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now.Format(ubo._timeLayout), v.Format(ubo._timeLayout))
-	}
-	if v, err := ubo.GetDataAttrAsTimeWithLayout("time[1]", ubo._timeLayout); err != nil {
-		t.Fatalf("%s failed: %s", name, err)
-	} else if v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
-	}
-	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[0]", ubo._timeLayout); v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
-	}
-	if v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("time[1]", ubo._timeLayout); v.Second() != now.Second() {
-		t.Fatalf("%s failed: expected %#v but received %#v", name, now, v)
+}
+
+func TestUniversalBo_SetDataAttr_time(t *testing.T) {
+	testName := "TestUniversalBo_SetDataAttr_time"
+	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
+	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
+	for i, roundingOpt := range roundingOptList {
+		t.Run(fmt.Sprintf("%v", roundingOpt), func(t *testing.T) {
+			_id := "id"
+			_tagVersion := uint64(1357)
+			ubo := NewUniversalBo(_id, _tagVersion, UboOpt{TimestampRounding: roundingOpt})
+			now := time.Now()
+			ubo.SetDataAttr("tstr", now.Format(time.RFC3339Nano))
+			ubo.SetDataAttr("t.inner[0]", now)
+			ubo.SetDataAttr("t.inner[1]", &now)
+
+			if v, err := ubo.GetDataAttrAsTimeWithLayout("tstr", DefaultTimeLayout); err != nil {
+				t.Fatalf("%s failed: %s", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			if v, err := ubo.GetDataAttrAsTimeWithLayout("t.inner[0]", DefaultTimeLayout); err != nil {
+				t.Fatalf("%s failed: %s", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			if v, err := ubo.GetDataAttrAsTimeWithLayout("t.inner[1]", DefaultTimeLayout); err != nil {
+				t.Fatalf("%s failed: %s", testName, err)
+			} else if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			v := ubo.GetDataAttrAsTimeWithLayoutUnsafe("tstr", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			v = ubo.GetDataAttrAsTimeWithLayoutUnsafe("t.inner[0]", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+
+			v = ubo.GetDataAttrAsTimeWithLayoutUnsafe("t.inner[1]", DefaultTimeLayout)
+			if d := v.Nanosecond() - now.Nanosecond(); d > expectedDeltaLimit2List[i] || d < expectedDeltaLimit1List[i] {
+				t.Fatalf("%s failed: original time %s - expected delta between {%v - %v} / stored time %s - delta %v", testName, now, expectedDeltaLimit1List[i], expectedDeltaLimit2List[i], v, d)
+			}
+		})
 	}
 }
 

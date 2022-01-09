@@ -140,7 +140,11 @@ func (dao *UniversalDaoSql) GdaoCreateFilter(tableName string, bo godal.IGeneric
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoSql) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
-	return NewUniversalBoFromGbo(gbo)
+	opts := make([]UboOpt, 0)
+	if dao.GetSqlFlavor() == prom.FlavorCosmosDb {
+		opts = append(opts, UboOpt{TimeLayout: time.RFC3339Nano})
+	}
+	return NewUniversalBoFromGbo(gbo, opts...)
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.

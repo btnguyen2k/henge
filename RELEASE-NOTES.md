@@ -1,5 +1,11 @@
 # henge release notes
 
+## 2022-01-09 - v0.5.5
+
+- Rework `UniversalBo` to better handle value of type `time.Time` (and `*time.Time`):
+  - `UniversalBo.SetDataAttr` will convert value of type `time.Time` (and `*time.Time`) to string using layout `DefaultTimeLayout` before storing.
+  - time-layout (and timestamp-rounding) should be private to `UniversalBo` (and `henge`).
+
 ## 2021-12-16 - v0.5.4
 
 - (Breaking change) Migrate timestamp-rounding and time-layout settings to `UniversalBo`. These settings are now per-`UniversalBo` instance, no longer at `henge`'s package-level.

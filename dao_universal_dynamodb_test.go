@@ -18,6 +18,83 @@ import (
 	"github.com/btnguyen2k/prom"
 )
 
+func TestDynamodb_toFilterMap_nil(t *testing.T) {
+	testName := "Test_toFilterMap_nil"
+	if v, err := toFilterMap(nil); v != nil || err != nil {
+		t.Fatalf("%s failed: expected nil but received %#v (%s)", testName, v, err)
+	}
+}
+
+func TestDynamodb_toFilterMap_FilterOptFieldOpValue(t *testing.T) {
+	testName := "Test_toFilterMap_FilterOptFieldOpValue"
+	optList := []godal.FilterOperator{godal.FilterOpNotEqual, godal.FilterOpGreater, godal.FilterOpGreaterOrEqual, godal.FilterOpLess, godal.FilterOpLessOrEqual}
+	for _, opt := range optList {
+		t.Run(fmt.Sprintf("%v", opt), func(t *testing.T) {
+			input := godal.FilterOptFieldOpValue{FieldName: "myfield", Operator: opt, Value: "myval"}
+			result, err := toFilterMap(input)
+			if result != nil || err == nil {
+				t.Fatalf("%s failed: %#v / %s", testName, result, err)
+			}
+		})
+	}
+
+	input := godal.FilterOptFieldOpValue{FieldName: "myfield1", Operator: godal.FilterOpEqual, Value: "myval"}
+	expected := map[string]interface{}{"myfield1": "myval"}
+	if result, err := toFilterMap(input); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	} else if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("%s failed: expected %v but received %#v", testName, expected, result)
+	}
+
+	input = godal.FilterOptFieldOpValue{FieldName: "myfield2", Operator: godal.FilterOpEqual, Value: 123}
+	expected = map[string]interface{}{"myfield2": 123}
+	if result, err := toFilterMap(&input); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	} else if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("%s failed: expected %v but received %#v", testName, expected, result)
+	}
+}
+
+func TestDynamodb_toFilterMap_FilterOptFieldIsNull(t *testing.T) {
+	testName := "Test_toFilterMap_FilterOptFieldIsNull"
+
+	input := godal.FilterOptFieldIsNull{FieldName: "myfield1"}
+	expected := map[string]interface{}{"myfield1": nil}
+	if result, err := toFilterMap(input); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	} else if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("%s failed: expected %v but received %#v", testName, expected, result)
+	}
+
+	input = godal.FilterOptFieldIsNull{FieldName: "myfield2"}
+	expected = map[string]interface{}{"myfield2": nil}
+	if result, err := toFilterMap(&input); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	} else if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("%s failed: expected %v but received %#v", testName, expected, result)
+	}
+}
+
+func TestDynamodb_toFilterMap_FilterOptAnd(t *testing.T) {
+	testName := "Test_toFilterMap_FilterOptAnd"
+
+	input := godal.FilterOptAnd{}
+	input.Add(godal.FilterOptFieldIsNull{FieldName: "field"})
+	{
+		inner := &godal.FilterOptAnd{}
+		inner.Add(godal.FilterOptFieldOpValue{FieldName: "myfield", Operator: godal.FilterOpEqual, Value: "myval"})
+		inner.Add(godal.FilterOptFieldOpValue{FieldName: "age", Operator: godal.FilterOpEqual, Value: 18})
+		input.Add(inner)
+	}
+
+	expected := map[string]interface{}{"field": nil, "myfield": "myval", "age": 18}
+	if result, err := toFilterMap(input); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	} else if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("%s failed: expected %v but received %#v", testName, expected, result)
+	}
+}
+
 func TestRowMapperDynamodb_ToRow(t *testing.T) {
 	name := "TestRowMapperDynamodb_ToRow"
 	rm := buildRowMapperDynamodb("tbl_test", "pk")
@@ -52,22 +129,41 @@ func TestRowMapperDynamodb_ToRow(t *testing.T) {
 }
 
 func TestRowMapperDynamodb_ToBo(t *testing.T) {
-	name := "TestRowMapperDynamodb_ToBo"
+	testName := "TestRowMapperDynamodb_ToBo"
 	rm := buildRowMapperDynamodb("tbl_test", "pk")
-	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: `{"field":"value"}`}); err != nil || bo == nil {
-		t.Fatalf("%s failed: %s / %#v", name, err, bo)
-	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
-		t.Fatalf("%s failed: %s / %#v", name, err, data)
-	}
-	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: []byte(`{"field":"value"}`)}); err != nil || bo == nil {
-		t.Fatalf("%s failed: %s / %#v", name, err, bo)
-	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
-		t.Fatalf("%s failed: %s / %#v", name, err, data)
-	}
-	if bo, err := rm.ToBo("tbl_test", map[string]interface{}{FieldData: map[string]string{"field": "value"}}); err != nil || bo == nil {
-		t.Fatalf("%s failed: %s / %#v", name, err, bo)
-	} else if data, err := bo.GboGetAttr(FieldData, nil); err != nil || data != `{"field":"value"}` {
-		t.Fatalf("%s failed: %s / %#v", name, err, data)
+	now := time.Now().Round(time.Millisecond)
+	next := now.Add(123 * time.Millisecond)
+	dataFieldValueList := []interface{}{`{"field":"value"}`, []byte(`{"field":"value"}`), map[string]string{"field": "value"}}
+	for _, dataFieldValue := range dataFieldValueList {
+		t.Run(fmt.Sprintf("%v", dataFieldValue), func(t *testing.T) {
+			input := map[string]interface{}{
+				FieldId:          "myid",
+				FieldTagVersion:  123,
+				FieldTimeCreated: now,
+				FieldTimeUpdated: next,
+				FieldData:        dataFieldValue,
+			}
+			bo, err := rm.ToBo("tbl_test", input)
+			if bo == nil || err != nil {
+				t.Fatalf("%s failed: %s / %#v", testName, err, bo)
+			}
+
+			if v, err := bo.GboGetAttr(FieldId, nil); err != nil || v != "myid" {
+				t.Fatalf("%s failed: expected %#v but received %#v / %s", testName, "id", v, err)
+			}
+			if v, err := bo.GboGetAttr(FieldTagVersion, nil); err != nil || v != 123 {
+				t.Fatalf("%s failed: expected %#v but received %#v / %s", testName, 123, v, err)
+			}
+			if v, err := bo.GboGetAttr(FieldTimeCreated, nil); err != nil || !now.Equal(v.(time.Time)) {
+				t.Fatalf("%s failed: expected %#v but received %#v / %s", testName, now, v, err)
+			}
+			if v, err := bo.GboGetAttr(FieldTimeUpdated, nil); err != nil || !next.Equal(v.(time.Time)) {
+				t.Fatalf("%s failed: expected %#v but received %#v / %s", testName, next, v, err)
+			}
+			if v, err := bo.GboGetAttr(FieldData, nil); err != nil || v != `{"field":"value"}` {
+				t.Fatalf("%s failed: expected %#v but received %#v / %s", testName, `{"field":"value"}`, v, err)
+			}
+		})
 	}
 }
 
@@ -1217,6 +1313,7 @@ func TestUniversalDaoDynamodb_CreateUpdateGet_Checksum(t *testing.T) {
 			t.Fatalf("%s failed: expected %#v but received %#v", testName, v0, v1)
 		}
 		if bo.GetChecksum() != user0.GetChecksum() {
+			fmt.Printf("%s vs %s\n", bo.timeCreated, user0.timeCreated)
 			t.Fatalf("%s failed: expected %#v but received %#v", testName, user0.GetChecksum(), bo.GetChecksum())
 		}
 

@@ -60,34 +60,26 @@ func InitCosmosdbCollection(sqlc *prom.SqlConnect, tableName string, spec *Cosmo
 
 const (
 	// CosmosdbColId holds the name of CosmosDB collection's "id" field.
-	CosmosdbColId = "id"
+	CosmosdbColId = FieldId // since CosmosDB is schemaless, name of "id" field can be the same as name ò "id" db column
 )
 
 func buildRowMapperCosmosdb() godal.IRowMapper {
-	return &rowMapperCosmosdb{wrap: cosmosdbsql.GenericRowMapperCosmosdbInstance}
+	return &rowMapperCosmosdb{cosmosdbsql.GenericRowMapperCosmosdbInstance}
 }
 
 // rowMapperCosmosdb is an implementation of godal.IRowMapper specific for Azure Cosmos DB.
 type rowMapperCosmosdb struct {
-	wrap godal.IRowMapper
-}
-
-func (r *rowMapperCosmosdb) ToDbColName(_, fieldName string) string {
-	return fieldName
-}
-
-func (r *rowMapperCosmosdb) ToBoFieldName(_, colName string) string {
-	return colName
+	godal.IRowMapper
 }
 
 // ToRow implements godal.IRowMapper.ToRow.
 func (r *rowMapperCosmosdb) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
-	row, err := r.wrap.ToRow(storageId, bo)
+	row, err := r.IRowMapper.ToRow(storageId, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
-		m[CosmosdbColId] = m[FieldId]
-		if CosmosdbColId != FieldId {
-			delete(m, FieldId)
-		}
+		// if CosmosdbColId != FieldId {
+		// 	m[CosmosdbColId] = m[FieldId]
+		// 	delete(m, FieldId)
+		// }
 		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
 		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, time.RFC3339)
 		m[FieldTimeUpdated], _ = bo.GboGetTimeWithLayout(FieldTimeUpdated, time.RFC3339)
@@ -98,12 +90,13 @@ func (r *rowMapperCosmosdb) ToRow(storageId string, bo godal.IGenericBo) (interf
 
 // ToBo implements godal.IRowMapper.ToBo.
 func (r *rowMapperCosmosdb) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
-	gbo, err := r.wrap.ToBo(storageId, row)
+	gbo, err := r.IRowMapper.ToBo(storageId, row)
 	if err == nil && gbo != nil {
-		var v interface{}
-		v, err = gbo.GboGetAttr(CosmosdbColId, nil)
-		gbo.GboSetAttr(CosmosdbColId, nil)
-		gbo.GboSetAttr(FieldId, v)
+		// if CosmosdbColId != FieldId {
+		// 	v, _ := gbo.GboGetAttr(CosmosdbColId, nil)
+		// 	gbo.GboSetAttr(CosmosdbColId, nil)
+		// 	gbo.GboSetAttr(FieldId, v)
+		// }
 		if data, err := gbo.GboGetAttr(FieldData, nil); err == nil {
 			// Note: convert 'data' column from row to JSON-encoded string before storing to FieldData
 			if str, ok := data.(string); ok {
@@ -117,11 +110,6 @@ func (r *rowMapperCosmosdb) ToBo(storageId string, row interface{}) (godal.IGene
 		}
 	}
 	return gbo, err
-}
-
-// ColumnsList implements godal.IRowMapper.ColumnsList.
-func (r *rowMapperCosmosdb) ColumnsList(storageId string) []string {
-	return r.wrap.ColumnsList(storageId)
 }
 
 // NewCosmosdbConnection is helper function to create connection pools for Azure Cosmos DB using database/sql interface.
