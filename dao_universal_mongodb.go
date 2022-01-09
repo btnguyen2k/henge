@@ -19,36 +19,20 @@ func InitMongoCollection(mc *prom.MongoConnect, collectionName string) error {
 }
 
 func buildRowMapperMongo() godal.IRowMapper {
-	return &rowMapperMongo{wrap: mongo.GenericRowMapperMongoInstance}
+	return &rowMapperMongo{mongo.GenericRowMapperMongoInstance}
 }
 
 // rowMapperMongo is an implementation of godal.IRowMapper specific for MongoDB.
 type rowMapperMongo struct {
-	wrap godal.IRowMapper
-}
-
-func (r *rowMapperMongo) ToDbColName(_, fieldName string) string {
-	// MongoDB is schemaless, field-name should also be column-name
-	if fieldName == FieldId {
-		return MongoColId
-	}
-	return fieldName
-}
-
-func (r *rowMapperMongo) ToBoFieldName(_, colName string) string {
-	// MongoDB is schemaless, field-name should also be column-name
-	if colName == MongoColId {
-		return FieldId
-	}
-	return colName
+	godal.IRowMapper
 }
 
 // ToRow implements godal.IRowMapper.ToRow.
 func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface{}, error) {
-	row, err := r.wrap.ToRow(storageId, bo)
+	row, err := r.IRowMapper.ToRow(storageId, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
-		m[MongoColId] = m[FieldId]
 		if MongoColId != FieldId {
+			m[MongoColId] = m[FieldId]
 			delete(m, FieldId)
 		}
 		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
@@ -61,12 +45,13 @@ func (r *rowMapperMongo) ToRow(storageId string, bo godal.IGenericBo) (interface
 
 // ToBo implements godal.IRowMapper.ToBo.
 func (r *rowMapperMongo) ToBo(storageId string, row interface{}) (godal.IGenericBo, error) {
-	gbo, err := r.wrap.ToBo(storageId, row)
+	gbo, err := r.IRowMapper.ToBo(storageId, row)
 	if err == nil && gbo != nil {
-		var v interface{}
-		v, err = gbo.GboGetAttr(MongoColId, nil)
-		gbo.GboSetAttr(MongoColId, nil)
-		gbo.GboSetAttr(FieldId, v)
+		if MongoColId != FieldId {
+			v, _ := gbo.GboGetAttr(MongoColId, nil)
+			gbo.GboSetAttr(MongoColId, nil)
+			gbo.GboSetAttr(FieldId, v)
+		}
 		if data, err := gbo.GboGetAttr(FieldData, nil); err == nil {
 			// Note: convert 'data' column from row to JSON-encoded string before storing to FieldData
 			if str, ok := data.(string); ok {
@@ -80,11 +65,6 @@ func (r *rowMapperMongo) ToBo(storageId string, row interface{}) (godal.IGeneric
 		}
 	}
 	return gbo, err
-}
-
-// ColumnsList implements godal.IRowMapper.ColumnsList.
-func (r *rowMapperMongo) ColumnsList(storageId string) []string {
-	return r.wrap.ColumnsList(storageId)
 }
 
 // NewUniversalDaoMongo is helper method to create UniversalDaoMongo instance.
@@ -119,7 +99,7 @@ func (dao *UniversalDaoMongo) GdaoCreateFilter(_ string, bo godal.IGenericBo) go
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoMongo) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
-	return NewUniversalBoFromGbo(gbo)
+	return NewUniversalBoFromGbo(gbo, UboOpt{TimeLayout: time.RFC3339})
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.

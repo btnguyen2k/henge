@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -142,27 +141,19 @@ func buildRowMapperDynamodb(tableName string, pkPrefix string) godal.IRowMapper 
 	if pkPrefix != "" {
 		pkAttrs = []string{pkPrefix, FieldId}
 	}
-	return &rowMapperDynamodb{wrap: &dynamodb.GenericRowMapperDynamodb{
+	return &rowMapperDynamodb{&dynamodb.GenericRowMapperDynamodb{
 		ColumnsListMap: map[string][]string{tableName: pkAttrs},
 	}}
 }
 
 // rowMapperDynamodb is an implementation of godal.IRowMapper specific for AWS DynamoDB.
 type rowMapperDynamodb struct {
-	wrap godal.IRowMapper
-}
-
-func (r *rowMapperDynamodb) ToDbColName(tableName, fieldName string) string {
-	return fieldName
-}
-
-func (r *rowMapperDynamodb) ToBoFieldName(tableName, colName string) string {
-	return colName
+	godal.IRowMapper
 }
 
 // ToRow implements godal.IRowMapper.ToRow.
 func (r *rowMapperDynamodb) ToRow(tableName string, bo godal.IGenericBo) (interface{}, error) {
-	row, err := r.wrap.ToRow(tableName, bo)
+	row, err := r.IRowMapper.ToRow(tableName, bo)
 	if m, ok := row.(map[string]interface{}); err == nil && ok && m != nil {
 		m[FieldTagVersion], _ = bo.GboGetAttr(FieldTagVersion, nil) // tag-version should be integer
 		m[FieldTimeCreated], _ = bo.GboGetTimeWithLayout(FieldTimeCreated, time.RFC3339)
@@ -174,7 +165,7 @@ func (r *rowMapperDynamodb) ToRow(tableName string, bo godal.IGenericBo) (interf
 
 // ToBo implements godal.IRowMapper.ToBo.
 func (r *rowMapperDynamodb) ToBo(tableName string, row interface{}) (godal.IGenericBo, error) {
-	gbo, err := r.wrap.ToBo(tableName, row)
+	gbo, err := r.IRowMapper.ToBo(tableName, row)
 	if err == nil && gbo != nil {
 		if data, err := gbo.GboGetAttr(FieldData, nil); err == nil {
 			// Note: convert 'data' column from row to JSON-encoded string before storing to FieldData
@@ -189,11 +180,6 @@ func (r *rowMapperDynamodb) ToBo(tableName string, row interface{}) (godal.IGene
 		}
 	}
 	return gbo, err
-}
-
-// ColumnsList implements godal.IRowMapper.ColumnsList.
-func (r *rowMapperDynamodb) ColumnsList(tableName string) []string {
-	return r.wrap.ColumnsList(tableName)
 }
 
 // DynamodbDaoSpec holds specification of UniversalDaoDynamodb to be created.
@@ -363,7 +349,7 @@ func (dao *UniversalDaoDynamodb) GdaoCreateFilter(_ string, bo godal.IGenericBo)
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoDynamodb) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
-	return NewUniversalBoFromGbo(gbo)
+	return NewUniversalBoFromGbo(gbo, UboOpt{TimeLayout: time.RFC3339Nano})
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.
@@ -490,64 +476,6 @@ func (dao *UniversalDaoDynamodb) Get(id string) (*UniversalBo, error) {
 		return nil, err
 	}
 	return dao.ToUniversalBo(gbo), nil
-}
-
-// toConditionBuilder builds a ConditionBuilder from input.
-//
-//   - if input is expression.ConditionBuilder or *expression.ConditionBuilder: return it as *expression.ConditionBuilder.
-// 	 - if input is string, slice/array of bytes: assume input is a map in JSON, convert it to map to build ConditionBuilder.
-// 	 - if input is a map: build an "and" condition connecting sub-conditions where each sub-condition is an "equal" condition built from map entry.
-func toConditionBuilder(input interface{}) (*expression.ConditionBuilder, error) {
-	if input == nil {
-		return nil, nil
-	}
-	switch input.(type) {
-	case expression.ConditionBuilder:
-		result := input.(expression.ConditionBuilder)
-		return &result, nil
-	case *expression.ConditionBuilder:
-		return input.(*expression.ConditionBuilder), nil
-	}
-	v := reflect.ValueOf(input)
-	for ; v.Kind() == reflect.Ptr; v = v.Elem() {
-	}
-	switch v.Kind() {
-	case reflect.String:
-		// expect input to be a map in JSON
-		result := make(map[string]interface{})
-		if err := json.Unmarshal([]byte(v.Interface().(string)), &result); err != nil {
-			return nil, err
-		}
-		return toConditionBuilder(result)
-	case reflect.Array, reflect.Slice:
-		// expect input to be a map in JSON
-		t, err := reddo.ToSlice(v.Interface(), reflect.TypeOf(byte(0)))
-		if err != nil {
-			return nil, err
-		}
-		result := make(map[string]interface{})
-		if err := json.Unmarshal(t.([]byte), &result); err != nil {
-			return nil, err
-		}
-		return toConditionBuilder(result)
-	case reflect.Map:
-		m, err := reddo.ToMap(v.Interface(), reflect.TypeOf(make(map[string]interface{})))
-		if err != nil {
-			return nil, err
-		}
-		var result *expression.ConditionBuilder = nil
-		for k, v := range m.(map[string]interface{}) {
-			if result == nil {
-				t := expression.Name(k).Equal(expression.Value(v))
-				result = &t
-			} else {
-				t := result.And(expression.Name(k).Equal(expression.Value(v)))
-				result = &t
-			}
-		}
-		return result, err
-	}
-	return nil, fmt.Errorf("cannot convert %v to *expression.ConditionBuilder", input)
 }
 
 // GetN implements UniversalDao.GetN.
