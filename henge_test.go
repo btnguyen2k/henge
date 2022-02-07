@@ -302,7 +302,7 @@ func TestUniversalBo_ToMap(t *testing.T) {
 	testName := "TestUniversalBo_ToMap"
 	_id := "id"
 	_tagVersion := uint64(1357)
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
 	vStr := "a string"
@@ -372,7 +372,7 @@ func TestUniversalBo_datatypes(t *testing.T) {
 	fieldNameList := []string{"data.number[0]", "data.number[1]", "data.number[2]", "data.bool", "data.string"}
 	fieldValueList := []interface{}{int64(123), uint64(456), float64(12.56), true, "a string"}
 	fieldTypeList := []reflect.Type{reddo.TypeInt, reddo.TypeUint, reddo.TypeFloat, reddo.TypeBool, reddo.TypeString}
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
 	for i, roundingOpt := range roundingOptList {
@@ -419,7 +419,7 @@ func TestUniversalBo_json(t *testing.T) {
 	fieldNameList := []string{"data.number[0]", "data.number[1]", "data.number[2]", "data.bool", "data.string"}
 	fieldValueList := []interface{}{int64(123), uint64(456), float64(12.56), true, "a string"}
 	fieldTypeList := []reflect.Type{reddo.TypeInt, reddo.TypeUint, reddo.TypeFloat, reddo.TypeBool, reddo.TypeString}
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	timeLayoutList := []string{"2006-01-02T15:04:05.999999999Z07:00", "2006-01-02T15:04:05.999999999Z07:00", "2006-01-02T15:04:05.999999Z07:00", "2006-01-02T15:04:05.999Z07:00", "2006-01-02T15:04:05Z07:00"}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
@@ -560,7 +560,7 @@ func TestUniversalBo_SetTagVersion(t *testing.T) {
 
 func TestUniversalBo_GetTimeCreated_rounding(t *testing.T) {
 	name := "TestUniversalBo_GetTimeCreated_rounding"
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
 	for i, roundingOpt := range roundingOptList {
@@ -578,7 +578,7 @@ func TestUniversalBo_GetTimeCreated_rounding(t *testing.T) {
 
 func TestUniversalBo_SetTimeUpdated_rounding(t *testing.T) {
 	name := "TestUniversalBo_SetTimeUpdated_rounding"
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
 	for i, roundingOpt := range roundingOptList {
@@ -597,7 +597,7 @@ func TestUniversalBo_SetTimeUpdated_rounding(t *testing.T) {
 
 func TestUniversalBo_SetGet_rounding(t *testing.T) {
 	name := "TestUniversalBo_SetGet_rounding"
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
 	for i, roundingOpt := range roundingOptList {
@@ -685,7 +685,7 @@ func TestUniversalBo_SetExtraAttr(t *testing.T) {
 
 func TestUniversalBo_SetExtraAttr_time(t *testing.T) {
 	testName := "TestUniversalBo_SetExtraAttr_time"
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
 	for i, roundingOpt := range roundingOptList {
@@ -775,7 +775,7 @@ func TestUniversalBo_SetDataAttr(t *testing.T) {
 
 func TestUniversalBo_SetDataAttr_time(t *testing.T) {
 	testName := "TestUniversalBo_SetDataAttr_time"
-	roundingOptList := []TimestampRoundSetting{TimestampRoundSettingNone, TimestampRoundSettingNanosecond, TimestampRoundSettingMicrosecond, TimestampRoundSettingMillisecond, TimestampRoundSettingSecond}
+	roundingOptList := []TimestampRoundingSetting{TimestampRoundingSettingNone, TimestampRoundingSettingNanosecond, TimestampRoundingSettingMicrosecond, TimestampRoundingSettingMillisecond, TimestampRoundingSettingSecond}
 	expectedDeltaLimit1List := []int{0, -0, -999, -999_999, -999_999_999}
 	expectedDeltaLimit2List := []int{999, 999, 999, 999_999, 999_999}
 	for i, roundingOpt := range roundingOptList {
@@ -917,7 +917,7 @@ func TestBuildBoFromUbo_PreserveTimestamp(t *testing.T) {
 	gbo.GboSetAttr(FieldData, `{"key":"value"}`)
 
 	// fmt.Println(_now, "/", _next)
-	ubo := NewUniversalBoFromGbo(gbo, UboOpt{TimestampRounding: TimestampRoundSettingNone})
+	ubo := NewUniversalBoFromGbo(gbo, UboOpt{TimestampRounding: TimestampRoundingSettingNone})
 	if ubo == nil {
 		t.Fatalf("%s failed: nil", name)
 	}

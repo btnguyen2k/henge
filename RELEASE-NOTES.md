@@ -1,5 +1,11 @@
 # henge release notes
 
+## 2022-02-07 - v0.5.6
+
+- Enhance `UniversalBo` to better support values of type `time.Time`:
+  - New function `UniversalBo.RoundTimestamp(t time.Time) time.Time`.
+  - New function `UniversalBo.NormalizeTimestampForStoring(t time.Time, layout string) string`.
+
 ## 2022-01-09 - v0.5.5
 
 - Rework `UniversalBo` to better handle value of type `time.Time` (and `*time.Time`):
