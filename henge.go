@@ -20,8 +20,10 @@ import (
 
 const (
 	// Version of package henge.
-	Version = "0.5.5"
+	Version = "0.5.6"
 )
+
+/*----------------------------------------------------------------------*/
 
 // clone a map, deep clone if possible.
 func cloneMap(src map[string]interface{}) map[string]interface{} {
@@ -77,7 +79,7 @@ func cloneSlice(src []interface{}) []interface{} {
 // Available since v0.5.4
 type UboOpt struct {
 	TimeLayout        string
-	TimestampRounding TimestampRoundSetting
+	TimestampRounding TimestampRoundingSetting
 }
 
 func _extractTimeLayout(opts ...UboOpt) string {
@@ -89,13 +91,13 @@ func _extractTimeLayout(opts ...UboOpt) string {
 	return DefaultTimeLayout
 }
 
-func _extractTimestampRounding(opts ...UboOpt) TimestampRoundSetting {
+func _extractTimestampRounding(opts ...UboOpt) TimestampRoundingSetting {
 	for _, opt := range opts {
-		if opt.TimestampRounding >= TimestampRoundSettingNone && opt.TimestampRounding <= TimestampRoundSettingSecond {
+		if opt.TimestampRounding >= TimestampRoundingSettingNone && opt.TimestampRounding <= TimestampRoundingSettingSecond {
 			return opt.TimestampRounding
 		}
 	}
-	return DefaultTimestampRoundSetting
+	return DefaultTimestampRoundingSetting
 }
 
 // NewUniversalBo is helper function to create a new UniversalBo instance.
@@ -171,33 +173,33 @@ const (
 	FieldExtras = "_ext"
 )
 
-// TimestampRoundSetting specifies how UniversalBo would round timestamp before storing.
+// TimestampRoundingSetting specifies how UniversalBo would round timestamp before storing.
 //
-// Available since v0.4.0
-type TimestampRoundSetting int
+// Available since v0.4.0 (renamed to TimestampRoundingSetting since v0.5.6)
+type TimestampRoundingSetting int
 
 const (
-	// TimestampRoundSettingNone specifies that timestamp is not rounded.
-	TimestampRoundSettingNone TimestampRoundSetting = iota
+	// TimestampRoundingSettingNone specifies that timestamp is not rounded.
+	TimestampRoundingSettingNone TimestampRoundingSetting = iota
 
-	// TimestampRoundSettingNanosecond specifies that timestamp is rounded to nanosecond.
-	TimestampRoundSettingNanosecond
+	// TimestampRoundingSettingNanosecond specifies that timestamp is rounded to nanosecond.
+	TimestampRoundingSettingNanosecond
 
-	// TimestampRoundSettingMicrosecond specifies that timestamp is rounded to microsecond.
-	TimestampRoundSettingMicrosecond
+	// TimestampRoundingSettingMicrosecond specifies that timestamp is rounded to microsecond.
+	TimestampRoundingSettingMicrosecond
 
-	// TimestampRoundSettingMillisecond specifies that timestamp is rounded to millisecond.
-	TimestampRoundSettingMillisecond
+	// TimestampRoundingSettingMillisecond specifies that timestamp is rounded to millisecond.
+	TimestampRoundingSettingMillisecond
 
-	// TimestampRoundSettingSecond specifies that timestamp is rounded to second.
-	TimestampRoundSettingSecond
+	// TimestampRoundingSettingSecond specifies that timestamp is rounded to second.
+	TimestampRoundingSettingSecond
 )
 
 const (
-	// DefaultTimestampRoundSetting is the default TimestampRoundSetting to be used if such setting is not specified.
+	// DefaultTimestampRoundingSetting is the default TimestampRoundingSetting to be used if such setting is not specified.
 	//
 	// Available since v0.5.4
-	DefaultTimestampRoundSetting = TimestampRoundSettingSecond
+	DefaultTimestampRoundingSetting = TimestampRoundingSettingSecond
 
 	// DefaultTimeLayout is the default layout used by UniversalBo to convert datetime values to string and vice versa if such setting is not specified.
 	//
@@ -205,21 +207,21 @@ const (
 	DefaultTimeLayout = time.RFC3339Nano
 )
 
-// roundTimestamp rounds the input time and return the result.
-// available since v0.4.0
-func roundTimestamp(t time.Time, trs TimestampRoundSetting) time.Time {
-	switch trs {
-	case TimestampRoundSettingNanosecond:
-		return t
-	case TimestampRoundSettingMicrosecond:
-		return t.Round(time.Microsecond)
-	case TimestampRoundSettingMillisecond:
-		return t.Round(time.Millisecond)
-	case TimestampRoundSettingSecond:
-		return t.Round(time.Second)
-	}
-	return t
-}
+// // roundTimestamp rounds the input time and return the result.
+// // available since v0.4.0
+// func roundTimestamp(t time.Time, trs TimestampRoundingSetting) time.Time {
+// 	switch trs {
+// 	case TimestampRoundingSettingNanosecond:
+// 		return t
+// 	case TimestampRoundingSettingMicrosecond:
+// 		return t.Round(time.Microsecond)
+// 	case TimestampRoundingSettingMillisecond:
+// 		return t.Round(time.Millisecond)
+// 	case TimestampRoundingSettingSecond:
+// 		return t.Round(time.Second)
+// 	}
+// 	return t
+// }
 
 var (
 	topLevelFieldList = []string{FieldId, FieldData, FieldChecksum, FieldTagVersion, FieldTimeCreated, FieldTimeUpdated}
@@ -251,7 +253,7 @@ type UniversalBo struct {
 	_extraAttrs        map[string]interface{} `json:"_ext"` // other top-level arbitrary attributes
 	_lock              sync.RWMutex
 	_dirty             bool
-	_timestampRounding TimestampRoundSetting
+	_timestampRounding TimestampRoundingSetting
 }
 
 // FuncPreUboToMap is used by UniversalBo.ToMap to export UniversalBo's attributes to a map[string]interface{}.
@@ -459,11 +461,35 @@ func (ubo *UniversalBo) GetChecksum() string {
 	return ubo.checksum
 }
 
+// RoundTimestamp rounds the input time according to bo's timestamp-rounding setting and returns the result.
+//
+// Available since v0.5.6
+func (ubo *UniversalBo) RoundTimestamp(t time.Time) time.Time {
+	switch ubo._timestampRounding {
+	case TimestampRoundingSettingMicrosecond:
+		return t.Round(time.Microsecond)
+	case TimestampRoundingSettingMillisecond:
+		return t.Round(time.Millisecond)
+	case TimestampRoundingSettingSecond:
+		return t.Round(time.Second)
+	}
+	return t
+}
+
+// NormalizeTimestampForStoring normalizes the input time for storing.
+//   - Firstly, the input time is rounded according to bo's timestamp-rounding setting.
+//   - Then, the rounded time is converted to string according to the specified layout.
+//
+// Available since v0.5.6
+func (ubo *UniversalBo) NormalizeTimestampForStoring(t time.Time, layout string) string {
+	return ubo.RoundTimestamp(t).Format(layout)
+}
+
 // GetTimestampRounding returns this BO's timestamp-rounding setting.
 // Timestamp-rounding controls how BO's create/update timestamp will be rounded before storing.
 //
 // Available since v0.5.4
-func (ubo *UniversalBo) GetTimestampRounding() TimestampRoundSetting {
+func (ubo *UniversalBo) GetTimestampRounding() TimestampRoundingSetting {
 	return ubo._timestampRounding
 }
 
@@ -471,7 +497,7 @@ func (ubo *UniversalBo) GetTimestampRounding() TimestampRoundSetting {
 // Timestamp-rounding controls how BO's create/update timestamp will be rounded before storing.
 //
 // Available since v0.5.4
-func (ubo *UniversalBo) SetTimestampRounding(value TimestampRoundSetting) *UniversalBo {
+func (ubo *UniversalBo) SetTimestampRounding(value TimestampRoundingSetting) *UniversalBo {
 	ubo._timestampRounding = value
 	return ubo
 }
@@ -560,9 +586,9 @@ func (ubo *UniversalBo) SetDataAttr(path string, value interface{}) error {
 	}
 	switch value.(type) {
 	case time.Time:
-		value = roundTimestamp(value.(time.Time), ubo._timestampRounding).Format(DefaultTimeLayout)
+		value = ubo.NormalizeTimestampForStoring(value.(time.Time), DefaultTimeLayout)
 	case *time.Time:
-		value = roundTimestamp(*value.(*time.Time), ubo._timestampRounding).Format(DefaultTimeLayout)
+		value = ubo.NormalizeTimestampForStoring(*value.(*time.Time), DefaultTimeLayout)
 	}
 	return ubo._sdata.SetValue(path, value)
 }
@@ -616,9 +642,9 @@ func (ubo *UniversalBo) SetExtraAttr(key string, value interface{}) *UniversalBo
 	ubo._dirty = true
 	switch value.(type) {
 	case time.Time:
-		value = roundTimestamp(value.(time.Time), ubo._timestampRounding)
+		value = ubo.RoundTimestamp(value.(time.Time))
 	case *time.Time:
-		value = roundTimestamp(*value.(*time.Time), ubo._timestampRounding)
+		value = ubo.RoundTimestamp(*value.(*time.Time))
 	}
 	ubo._extraAttrs[key] = value
 	return ubo
@@ -644,8 +670,8 @@ func _requireTimeUpdatedSyncIfChecksumChange(opts ...UboSyncOpts) bool {
 
 func (ubo *UniversalBo) _sync(opts ...UboSyncOpts) *UniversalBo {
 	if ubo._dirty {
-		ubo.timeCreated = roundTimestamp(ubo.timeCreated, ubo._timestampRounding)
-		ubo.timeUpdated = roundTimestamp(ubo.timeUpdated, ubo._timestampRounding)
+		ubo.timeCreated = ubo.RoundTimestamp(ubo.timeCreated)
+		ubo.timeUpdated = ubo.RoundTimestamp(ubo.timeUpdated)
 		oldChecksum := ubo.checksum
 		csumMap := map[string]interface{}{
 			"id":          ubo.id,
@@ -657,7 +683,7 @@ func (ubo *UniversalBo) _sync(opts ...UboSyncOpts) *UniversalBo {
 		ubo.checksum = fmt.Sprintf("%x", checksum.Md5Checksum(csumMap))
 		if _requireTimeUpdatedSync(opts...) ||
 			(_requireTimeUpdatedSyncIfChecksumChange(opts...) && oldChecksum != ubo.checksum) {
-			ubo.timeUpdated = roundTimestamp(time.Now(), ubo._timestampRounding)
+			ubo.timeUpdated = ubo.RoundTimestamp(time.Now())
 		}
 		js, _ := json.Marshal(ubo._data)
 		ubo.dataJson = string(js)
@@ -694,6 +720,8 @@ func (ubo *UniversalBo) Clone() *UniversalBo {
 	clone._parseDataJson(dataInitNone)
 	return clone
 }
+
+/*----------------------------------------------------------------------*/
 
 // UniversalDao defines API to access UniversalBo storage.
 type UniversalDao interface {
