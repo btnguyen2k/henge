@@ -195,7 +195,8 @@ type DynamodbDaoSpec struct {
 //   - uidxAttrs list of unique indexes, each unique index is a combination of table columns.
 //   - the table has default pk as { FieldId }. If pkPrefix is supplied, table pk becomes { pkPrefix, FieldId }.
 //   - static value for pkPrefix attribute can be specified via pkPrefixValue.
-func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, spec *DynamodbDaoSpec) *UniversalDaoDynamodb {
+//   - defaultUboOpts: (since v0.5.7) the default options to be used by the DAO when creating UniversalBo instances.
+func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, spec *DynamodbDaoSpec, defaultUboOpts ...UboOpt) *UniversalDaoDynamodb {
 	if spec == nil {
 		spec = &DynamodbDaoSpec{}
 	}
@@ -208,9 +209,11 @@ func NewUniversalDaoDynamodb(adc *prom.AwsDynamodbConnect, tableName string, spe
 		uidxHf1:        checksum.Sha1HashFunc,
 		uidxHf2:        checksum.Md5HashFunc,
 		gsiSortMapping: make(map[string]string),
+		defaultUboOpts: defaultUboOpts,
 	}
 	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
 	dao.SetRowMapper(buildRowMapperDynamodb(tableName, spec.PkPrefix))
+	dao.Init()
 	return dao
 }
 
@@ -224,6 +227,36 @@ type UniversalDaoDynamodb struct {
 	uidxAttrs        [][]string        // list of unique indexes (each unique index is a combination of table columns)
 	uidxHf1, uidxHf2 checksum.HashFunc // hash functions used to calculate unique index hash
 	gsiSortMapping   map[string]string // (since v0.5.2) mapping {fieldName->gsiName}, used to lookup GSI if sorting is specified
+	defaultUboOpts   []UboOpt          // (since v0.5.7) default options used by the DAO to create UniversalBo instances
+}
+
+// Init should be called to initialize the DAO instance before use.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoDynamodb) Init() error {
+	if len(dao.defaultUboOpts) == 0 {
+		uboOpt := UboOpt{TimeLayout: time.RFC3339Nano, TimestampRounding: TimestampRoundingSettingNanosecond}
+		dao.SetDefaultUboOpts([]UboOpt{uboOpt})
+	}
+	if dao.GetRowMapper() == nil {
+		dao.SetRowMapper(buildRowMapperDynamodb(dao.tableName, dao.pkPrefix))
+	}
+	return nil
+}
+
+// GetDefaultUboOpts returns the default options to be used by the DAO when creating UniversalBo instances.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoDynamodb) GetDefaultUboOpts() []UboOpt {
+	return dao.defaultUboOpts
+}
+
+// SetDefaultUboOpts sets the default options to be used by the DAO when creating UniversalBo instances.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoDynamodb) SetDefaultUboOpts(uboOpts []UboOpt) *UniversalDaoDynamodb {
+	dao.defaultUboOpts = uboOpts
+	return dao
 }
 
 // MapGsi associates a list of table fields (in order) with a GSI. The mappings are to be used for sorting.
@@ -349,7 +382,7 @@ func (dao *UniversalDaoDynamodb) GdaoCreateFilter(_ string, bo godal.IGenericBo)
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoDynamodb) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
-	return NewUniversalBoFromGbo(gbo, UboOpt{TimeLayout: time.RFC3339Nano})
+	return NewUniversalBoFromGbo(gbo, dao.defaultUboOpts...)
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.

@@ -76,6 +76,7 @@ func cloneSlice(src []interface{}) []interface{} {
 }
 
 // UboOpt can be supplied to NewUniversalBo and NewUniversalBoFromGbo to specify newly created BO's settings.
+//
 // Available since v0.5.4
 type UboOpt struct {
 	TimeLayout        string
@@ -206,22 +207,6 @@ const (
 	// Available since v0.5.4
 	DefaultTimeLayout = time.RFC3339Nano
 )
-
-// // roundTimestamp rounds the input time and return the result.
-// // available since v0.4.0
-// func roundTimestamp(t time.Time, trs TimestampRoundingSetting) time.Time {
-// 	switch trs {
-// 	case TimestampRoundingSettingNanosecond:
-// 		return t
-// 	case TimestampRoundingSettingMicrosecond:
-// 		return t.Round(time.Microsecond)
-// 	case TimestampRoundingSettingMillisecond:
-// 		return t.Round(time.Millisecond)
-// 	case TimestampRoundingSettingSecond:
-// 		return t.Round(time.Second)
-// 	}
-// 	return t
-// }
 
 var (
 	topLevelFieldList = []string{FieldId, FieldData, FieldChecksum, FieldTagVersion, FieldTimeCreated, FieldTimeUpdated}

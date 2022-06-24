@@ -1,5 +1,12 @@
 # henge release notes
 
+## 2022-06-24 - v0.5.7
+
+Allow time-layout and timestamp-rouding can be setup once when creating DAO instances.
+- `NewUniversalDaoMongo`: accept new optional argument `defaultUboOpts ...UboOpt`.
+- `NewUniversalDaoDynamodb`: accept new optional argument `defaultUboOpts ...UboOpt`.
+- `NewUniversalDaoSql`: accept new optional argument `defaultUboOpts ...UboOpt`.
+
 ## 2022-02-07 - v0.5.6
 
 - Enhance `UniversalBo` to better support values of type `time.Time`:

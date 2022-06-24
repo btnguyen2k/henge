@@ -15,6 +15,7 @@ import (
 	"github.com/btnguyen2k/consu/checksum"
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
+	"github.com/btnguyen2k/godal/dynamodb"
 	"github.com/btnguyen2k/prom"
 )
 
@@ -367,6 +368,29 @@ const (
 	awsDynamodbTableNoUidx = testTable + "_nouidx"
 	awsDynamodbTableUidx   = testTable + "_uidx"
 )
+
+func TestUniversalDaoDynamodb_Init(t *testing.T) {
+	testName := "TestUniversalDaoDynamodb_Init"
+
+	adc := _createAwsDynamodbConnect(t, testName)
+	defer adc.Close()
+	dao := &UniversalDaoDynamodb{
+		tableName:      "tableName",
+		pkPrefix:       "PkPrefix",
+		pkPrefixValue:  "PkPrefixValue",
+		uidxTableName:  "tableName" + AwsDynamodbUidxTableSuffix,
+		uidxHf1:        checksum.Sha1HashFunc,
+		uidxHf2:        checksum.Md5HashFunc,
+		gsiSortMapping: make(map[string]string),
+	}
+	dao.GenericDaoDynamodb = dynamodb.NewGenericDaoDynamodb(adc, godal.NewAbstractGenericDao(dao))
+	if err := dao.Init(); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	}
+	if len(dao.GetDefaultUboOpts()) == 0 {
+		t.Fatalf("%s failed: defaultUboOpts not set", testName)
+	}
+}
 
 func TestUniversalDaoDynamodb_Create(t *testing.T) {
 	testName := "TestUniversalDaoDynamodb_Create"
