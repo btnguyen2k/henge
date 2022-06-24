@@ -73,11 +73,16 @@ func (r *rowMapperMongo) ToBo(storageId string, row interface{}) (godal.IGeneric
 //       It can be done either in transaction (txModeOnWrite=true) or non-transaction (txModeOnWrite=false) mode.
 //       As of MongoDB 4.0, transactions are available for replica set deployments only. Since MongoDB 4.2, transactions are also available for sharded cluster.
 //       It is recommended to set "txModeOnWrite=true" whenever possible.
-func NewUniversalDaoMongo(mc *prom.MongoConnect, collectionName string, txModeOnWrite bool) UniversalDao {
-	dao := &UniversalDaoMongo{collectionName: collectionName}
+//   - defaultUboOpts: (since v0.5.7) the default options to be used by the DAO when creating UniversalBo instances.
+func NewUniversalDaoMongo(mc *prom.MongoConnect, collectionName string, txModeOnWrite bool, defaultUboOpts ...UboOpt) UniversalDao {
+	dao := &UniversalDaoMongo{
+		collectionName: collectionName,
+		defaultUboOpts: defaultUboOpts,
+	}
 	dao.GenericDaoMongo = mongo.NewGenericDaoMongo(mc, godal.NewAbstractGenericDao(dao))
 	dao.SetRowMapper(buildRowMapperMongo())
 	dao.SetTxModeOnWrite(txModeOnWrite)
+	dao.Init()
 	return dao
 }
 
@@ -89,7 +94,37 @@ const (
 // UniversalDaoMongo is MongoDB-based implementation of UniversalDao.
 type UniversalDaoMongo struct {
 	*mongo.GenericDaoMongo
-	collectionName string
+	collectionName string   // name of the MongoDB collection to store business objects
+	defaultUboOpts []UboOpt // (since v0.5.7) default options used by the DAO to create UniversalBo instances
+}
+
+// Init should be called to initialize the DAO instance before use.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoMongo) Init() error {
+	if len(dao.defaultUboOpts) == 0 {
+		uboOpt := UboOpt{TimeLayout: time.RFC3339, TimestampRounding: TimestampRoundingSettingSecond}
+		dao.SetDefaultUboOpts([]UboOpt{uboOpt})
+	}
+	if dao.GetRowMapper() == nil {
+		dao.SetRowMapper(buildRowMapperMongo())
+	}
+	return nil
+}
+
+// GetDefaultUboOpts returns the default options to be used by the DAO when creating UniversalBo instances.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoMongo) GetDefaultUboOpts() []UboOpt {
+	return dao.defaultUboOpts
+}
+
+// SetDefaultUboOpts sets the default options to be used by the DAO when creating UniversalBo instances.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoMongo) SetDefaultUboOpts(uboOpts []UboOpt) *UniversalDaoMongo {
+	dao.defaultUboOpts = uboOpts
+	return dao
 }
 
 // GdaoCreateFilter implements IGenericDao.GdaoCreateFilter.
@@ -97,12 +132,12 @@ func (dao *UniversalDaoMongo) GdaoCreateFilter(_ string, bo godal.IGenericBo) go
 	return godal.MakeFilter(map[string]interface{}{MongoColId: bo.GboGetAttrUnsafe(FieldId, reddo.TypeString)})
 }
 
-// ToUniversalBo transforms godal.IGenericBo to business object.
+// ToUniversalBo implements UniversalDao.ToUniversalBo.
 func (dao *UniversalDaoMongo) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
-	return NewUniversalBoFromGbo(gbo, UboOpt{TimeLayout: time.RFC3339})
+	return NewUniversalBoFromGbo(gbo, dao.defaultUboOpts...)
 }
 
-// ToGenericBo transforms business object to godal.IGenericBo.
+// ToGenericBo implements UniversalDao.ToGenericBo.
 func (dao *UniversalDaoMongo) ToGenericBo(ubo *UniversalBo) godal.IGenericBo {
 	if ubo == nil {
 		return nil

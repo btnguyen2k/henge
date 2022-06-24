@@ -12,6 +12,7 @@ import (
 
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
+	"github.com/btnguyen2k/godal/mongo"
 	"github.com/btnguyen2k/prom"
 )
 
@@ -151,6 +152,20 @@ var teardownTestMongo = func(t *testing.T, testName string) {
 		defer func() { testMc = nil }()
 		testMc.GetCollection(testTable).Drop(nil)
 		testMc.Close(nil)
+	}
+}
+
+func TestUniversalDaoMongo_Init(t *testing.T) {
+	testName := "TestUniversalDaoMongo_Init"
+	mc := _testMongoInitMongoConnect(t, testName, testTable)
+	defer mc.Close(nil)
+	dao := &UniversalDaoMongo{collectionName: testTable}
+	dao.GenericDaoMongo = mongo.NewGenericDaoMongo(mc, godal.NewAbstractGenericDao(dao))
+	if err := dao.Init(); err != nil {
+		t.Fatalf("%s failed: %s", testName, err)
+	}
+	if len(dao.GetDefaultUboOpts()) == 0 {
+		t.Fatalf("%s failed: defaultUboOpts not set", testName)
 	}
 }
 

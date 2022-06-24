@@ -51,13 +51,19 @@ func buildRowMapperSql(tableName string, extraColNameToFieldMappings map[string]
 //       RDBMS/SQL's implementation of GdaoSave is "try update, if failed then insert".
 //       It can be done either in transaction (txModeOnWrite=true) or non-transaction (txModeOnWrite=false) mode.
 //       Recommended setting is "txModeOnWrite=true".
-func NewUniversalDaoSql(sqlc *prom.SqlConnect, tableName string, txModeOnWrite bool, extraColNameToFieldMappings map[string]string) UniversalDao {
-	dao := &UniversalDaoSql{tableName: tableName}
+//   - defaultUboOpts: (since v0.5.7) the default options to be used by the DAO when creating UniversalBo instances.
+func NewUniversalDaoSql(sqlc *prom.SqlConnect, tableName string, txModeOnWrite bool,
+	extraColNameToFieldMappings map[string]string, defaultUboOpts ...UboOpt) UniversalDao {
+	dao := &UniversalDaoSql{
+		tableName:              tableName,
+		funcFilterGeneratorSql: defaultFilterGeneratorSql,
+		defaultSorting:         (&godal.SortingField{FieldName: FieldId}).ToSortingOpt(),
+		defaultUboOpts:         defaultUboOpts,
+	}
 	dao.IGenericDaoSql = sql.NewGenericDaoSql(sqlc, godal.NewAbstractGenericDao(dao))
 	dao.SetRowMapper(buildRowMapperSql(tableName, extraColNameToFieldMappings))
 	dao.SetTxModeOnWrite(txModeOnWrite).SetSqlFlavor(sqlc.GetDbFlavor())
-	dao.funcFilterGeneratorSql = defaultFilterGeneratorSql
-	dao.defaultSorting = (&godal.SortingField{FieldName: FieldId}).ToSortingOpt()
+	dao.Init()
 	return dao
 }
 
@@ -128,6 +134,83 @@ type UniversalDaoSql struct {
 	tableName              string
 	funcFilterGeneratorSql FuncFilterGeneratorSql
 	defaultSorting         *godal.SortingOpt
+	defaultUboOpts         []UboOpt // (since v0.5.7) default options used by the DAO to create UniversalBo instances
+}
+
+// Init should be called to initialize the DAO instance before use.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoSql) Init() error {
+	if len(dao.defaultUboOpts) == 0 {
+		uboOpt := UboOpt{TimeLayout: time.RFC3339, TimestampRounding: TimestampRoundingSettingSecond}
+		switch dao.GetSqlFlavor() {
+		case prom.FlavorCosmosDb:
+			uboOpt = UboOpt{TimeLayout: time.RFC3339Nano, TimestampRounding: TimestampRoundingSettingNanosecond}
+		case prom.FlavorSqlite:
+			uboOpt = UboOpt{TimeLayout: "2006-01-02 15:04:05Z07:00", TimestampRounding: TimestampRoundingSettingSecond}
+		}
+		dao.SetDefaultUboOpts([]UboOpt{uboOpt})
+	}
+	if dao.GetFuncFilterGeneratorSql() == nil {
+		dao.SetFuncFilterGeneratorSql(defaultFilterGeneratorSql)
+	}
+	if dao.GetDefaultSorting() == nil {
+		dao.SetDefaultSorting((&godal.SortingField{FieldName: FieldId}).ToSortingOpt())
+	}
+	return nil
+}
+
+// GetDefaultUboOpts returns the default options to be used by the DAO when creating UniversalBo instances.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoSql) GetDefaultUboOpts() []UboOpt {
+	return dao.defaultUboOpts
+}
+
+// SetDefaultUboOpts sets the default options to be used by the DAO when creating UniversalBo instances.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoSql) SetDefaultUboOpts(uboOpts []UboOpt) *UniversalDaoSql {
+	dao.defaultUboOpts = uboOpts
+	return dao
+}
+
+// GetFuncFilterGeneratorSql returns the function used to generate filter for universal BO.
+//
+// See FuncFilterGeneratorSql for more information.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoSql) GetFuncFilterGeneratorSql() FuncFilterGeneratorSql {
+	return dao.funcFilterGeneratorSql
+}
+
+// SetFuncFilterGeneratorSql returns the function used to generate filter for universal BO.
+//
+// See FuncFilterGeneratorSql for more information.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoSql) SetFuncFilterGeneratorSql(funcFilterGeneratorSql FuncFilterGeneratorSql) *UniversalDaoSql {
+	dao.funcFilterGeneratorSql = funcFilterGeneratorSql
+	return dao
+}
+
+// GetDefaultSorting returns the default sorting option to be used for querying BOs.
+//
+// See FuncFilterGeneratorSql for more information.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoSql) GetDefaultSorting() *godal.SortingOpt {
+	return dao.defaultSorting
+}
+
+// SetDefaultSorting sets the default sorting option to be used for querying BOs.
+//
+// See FuncFilterGeneratorSql for more information.
+//
+// Available since v0.5.7
+func (dao *UniversalDaoSql) SetDefaultSorting(defaultSorting *godal.SortingOpt) *UniversalDaoSql {
+	dao.defaultSorting = defaultSorting
+	return dao
 }
 
 // GdaoCreateFilter implements IGenericDao.GdaoCreateFilter.
@@ -140,11 +223,7 @@ func (dao *UniversalDaoSql) GdaoCreateFilter(tableName string, bo godal.IGeneric
 
 // ToUniversalBo transforms godal.IGenericBo to business object.
 func (dao *UniversalDaoSql) ToUniversalBo(gbo godal.IGenericBo) *UniversalBo {
-	opts := make([]UboOpt, 0)
-	if dao.GetSqlFlavor() == prom.FlavorCosmosDb {
-		opts = append(opts, UboOpt{TimeLayout: time.RFC3339Nano})
-	}
-	return NewUniversalBoFromGbo(gbo, opts...)
+	return NewUniversalBoFromGbo(gbo, dao.defaultUboOpts...)
 }
 
 // ToGenericBo transforms business object to godal.IGenericBo.
