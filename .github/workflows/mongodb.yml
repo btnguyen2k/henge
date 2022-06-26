@@ -1,4 +1,4 @@
-name: Henge
+name: MongoDB
 
 on:
   push:

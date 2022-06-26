@@ -1,4 +1,4 @@
-name: Henge
+name: CosmosDB
 
 on:
   push:
