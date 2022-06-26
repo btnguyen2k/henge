@@ -1,8 +1,10 @@
-name: CosmosDB
+name: Henge
 
 on:
   push:
-    branches: [ cosmosdb ]
+    branches: [ cosmosdb, main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   testWithCosmosDbSql:

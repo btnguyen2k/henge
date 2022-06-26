@@ -1,8 +1,10 @@
-name: SQL
+name: Henge
 
 on:
   push:
-    branches: [ sql ]
+    branches: [ sql, main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   testWithMySQL:

@@ -1,8 +1,10 @@
-name: MongoDB
+name: Henge
 
 on:
   push:
-    branches: [ mongodb ]
+    branches: [ mongodb, main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   testWithMongoStandalone:
