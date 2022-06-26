@@ -1,8 +1,10 @@
-name: DynamoDB
+name: Henge
 
 on:
   push:
-    branches: [ dynamodb ]
+    branches: [ dynamodb, main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   testWithAwsDynamoDB:

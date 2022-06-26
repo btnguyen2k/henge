@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  testWithAwsDynamoDB:
+  # testWithAwsDynamoDB:
     name: Test with AWS DynamoDB
     runs-on: ubuntu-latest
     steps:
