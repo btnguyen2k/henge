@@ -3,13 +3,14 @@ name: CosmosDB
 on:
   push:
     branches: [ cosmosdb, main ]
+  paths: [ '*cosmosdb*' ]
   pull_request:
     branches: [ main ]
 
 jobs:
   testWithCosmosDbSql:
     name: Test with Azure Cosmos DB (SQL API)
-    runs-on: windows-2016
+    runs-on: windows-latest
     steps:
     - name: Set up Go env
       uses: actions/setup-go@v2
@@ -27,9 +28,9 @@ jobs:
         $env:COSMOSDB_DRIVER='gocosmos'
         $env:COSMOSDB_URL='AccountEndpoint=https://127.0.0.1:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=='
         $env:TIMEZONE='Asia/Ho_Chi_Minh'
-        go test -cover -coverprofile="coverage_cosmosdb_sql.txt" -v .
+        go test -v -count 1 -p 1 -cover -coverprofile="coverage_cosmosdb_sql.txt" .
     - name: Codecov
-      uses: codecov/codecov-action@v1.0.15
+      uses: codecov/codecov-action@v3
       with:
         flags: cosmosdb_sql
         name: cosmosdb_sql
