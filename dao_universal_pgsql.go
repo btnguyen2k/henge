@@ -1,7 +1,7 @@
 package henge
 
 import (
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/sql"
 )
 
 // NewPgsqlConnection is helper function to create connection pools for PostgreSQL.

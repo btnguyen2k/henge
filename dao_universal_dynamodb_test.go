@@ -16,7 +16,7 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/dynamodb"
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/dynamodb"
 )
 
 func TestDynamodb_toFilterMap_nil(t *testing.T) {

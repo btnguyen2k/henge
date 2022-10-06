@@ -7,15 +7,14 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/mongo"
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/mongo"
 )
 
 // InitMongoCollection initializes a MongoDB collection to store henge business objects.
 //   - This function creates the specified collection with default settings.
 //   - Other than the collection, no index is created.
 func InitMongoCollection(mc *prom.MongoConnect, collectionName string) error {
-	_, err := mc.CreateCollection(collectionName)
-	return err
+	return mc.CreateCollection(collectionName)
 }
 
 func buildRowMapperMongo() godal.IRowMapper {

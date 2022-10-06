@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/sql"
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
 

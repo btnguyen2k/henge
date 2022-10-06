@@ -3,7 +3,6 @@ name: CosmosDB
 on:
   push:
     branches: [ cosmosdb, main ]
-    paths: [ '**.go' ]
   pull_request:
     branches: [ main ]
 

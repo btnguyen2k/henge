@@ -1,5 +1,9 @@
 # henge release notes
 
+## 2022-10-xx - v0.6.0
+
+- Upgraded to `btnguyen2k/prom v0.4.x` and `btnguyen2k/godal v0.6.x`.
+
 ## 2022-06-24 - v0.5.7
 
 Allow time-layout and timestamp-rouding can be setup once when creating DAO instances.
