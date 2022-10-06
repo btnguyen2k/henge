@@ -3,7 +3,7 @@ name: CosmosDB
 on:
   push:
     branches: [ cosmosdb, main ]
-    paths: [ '**cosmosdb**' ]
+    paths: [ 'dao_universal_cosmosdb.go', 'dao_universal_cosmosdb_test.go', 'dao_universal_cosmosdb_singletable_test.go' ]
   pull_request:
     branches: [ main ]
 
