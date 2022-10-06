@@ -104,7 +104,7 @@ jobs:
 
   testWithCosmosDbSql:
     name: Test with Azure Cosmos DB (SQL API)
-    runs-on: windows-2016
+    runs-on: windows-latest
     steps:
     - name: Set up Go env
       uses: actions/setup-go@v2
