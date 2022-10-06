@@ -42,16 +42,6 @@ func TestUniversalDaoCosmosdbSql_SingleTable_Create(t *testing.T) {
 			}
 		})
 	}
-
-	// testSqlc = _testCosmosdbInitSqlConnect(t, testName, testTable)
-	// defer testSqlc.Close()
-	// if dbRows, err := testSqlc.GetDB().Query(fmt.Sprintf("SELECT COUNT(1) FROM %s c WITH cross_partition=true", testTable)); err != nil {
-	// 	t.Fatalf("%s failed: %s", testName, err)
-	// } else if rows, err := testSqlc.FetchRows(dbRows); err != nil {
-	// 	t.Fatalf("%s failed: %s", testName, err)
-	// } else if value := rows[0]["$1"]; int(value.(float64)) != len(cosmosdbSingleTableBoTypes) {
-	// 	t.Fatalf("%s failed: expected collection to have %#v rows but received %#v", testName, len(cosmosdbSingleTableBoTypes), value)
-	// }
 }
 
 func TestUniversalDaoCosmosdbSql_SingleTable_CreateExistingPK(t *testing.T) {

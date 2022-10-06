@@ -24,8 +24,12 @@ jobs:
         export TIMEZONE="Asia/Ho_Chi_Minh"
         export MYSQL_DRIVER="mysql"
         export MYSQL_URL="test:test@tcp(localhost:3306)/test?charset=utf8mb4,utf8&parseTime=false&loc=Asia%2fHo_Chi_Minh"
-        go test -cover -coverprofile=coverage_mysql.txt -v .
-        bash <(curl -s https://codecov.io/bash) -cF mysql
+        go test -v -count 1 -p 1 -cover -coverprofile=coverage_mysql.txt .
+    - name: Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        flags: mysql
+        name: mysql
 
   testWithMSSQL:
     name: Test with MSSQL
@@ -44,8 +48,12 @@ jobs:
         export TIMEZONE="Asia/Ho_Chi_Minh"
         export MSSQL_DRIVER="sqlserver"
         export MSSQL_URL="sqlserver://sa:SecretPassword1@localhost:1433?database=tempdb"
-        go test -cover -coverprofile=coverage_mssql.txt -v .
-        bash <(curl -s https://codecov.io/bash) -cF mssql
+        go test -v -count 1 -p 1 -cover -coverprofile=coverage_mssql.txt .
+    - name: Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        flags: mssql
+        name: mssql
 
   testWithPostgreSQL:
     name: Test with PostgreSQL
@@ -64,8 +72,12 @@ jobs:
         export TIMEZONE="Asia/Ho_Chi_Minh"
         export PGSQL_DRIVER="pgx"
         export PGSQL_URL="postgres://test:test@localhost:5432/test?sslmode=disable&client_encoding=UTF-8&application_name=henge"
-        go test -cover -coverprofile=coverage_pgsql.txt -v .
-        bash <(curl -s https://codecov.io/bash) -cF pgsql
+        go test -v -count 1 -p 1 -cover -coverprofile=coverage_pgsql.txt .
+    - name: Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        flags: pgsql
+        name: pgsql
 
   testWithSqlite:
     name: Test with SQLite
@@ -83,12 +95,16 @@ jobs:
         mkdir ./temp
         export SQLITE_DRIVER="sqlite3"
         export SQLITE_URL="./temp/temp.db"
-        go test -cover -coverprofile=coverage_sqlite.txt -v .
-        bash <(curl -s https://codecov.io/bash) -cF sqlite
+        go test -v -count 1 -p 1 -cover -coverprofile=coverage_sqlite.txt .
+    - name: Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        flags: sqlite
+        name: sqlite
 
   testWithCosmosDbSql:
     name: Test with Azure Cosmos DB (SQL API)
-    runs-on: windows-2016
+    runs-on: windows-latest
     steps:
     - name: Set up Go env
       uses: actions/setup-go@v2
@@ -106,9 +122,9 @@ jobs:
         $env:COSMOSDB_DRIVER='gocosmos'
         $env:COSMOSDB_URL='AccountEndpoint=https://127.0.0.1:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=='
         $env:TIMEZONE='Asia/Ho_Chi_Minh'
-        go test -cover -coverprofile="coverage_cosmosdb_sql.txt" -v .
+        go test -v -count 1 -p 1 -cover -coverprofile="coverage_cosmosdb_sql.txt" .
     - name: Codecov
-      uses: codecov/codecov-action@v1.0.15
+      uses: codecov/codecov-action@v3
       with:
         flags: cosmosdb_sql
         name: cosmosdb_sql

@@ -25,5 +25,9 @@ jobs:
           export AWS_ACCESS_KEY_ID="DUMMYIDEXAMPLE"
           export AWS_SECRET_ACCESS_KEY="DUMMYEXAMPLEKEY"
           export AWS_DYNAMODB_ENDPOINT="http://localhost:8000"
-          go test -cover -coverprofile=coverage_dynamodb.txt -v .
-          bash <(curl -s https://codecov.io/bash) -cF dynamodb
+          go test -v -count 1 -p 1 -cover -coverprofile=coverage_dynamodb.txt .
+      - name: Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: dynamodb
+          name: dynamodb

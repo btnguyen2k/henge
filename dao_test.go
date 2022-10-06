@@ -3,7 +3,9 @@ package henge
 import (
 	"testing"
 
-	"github.com/btnguyen2k/prom"
+	"github.com/btnguyen2k/prom/dynamodb"
+	"github.com/btnguyen2k/prom/mongo"
+	"github.com/btnguyen2k/prom/sql"
 )
 
 type TestSetupOrTeardownFunc func(t *testing.T, testName string)
@@ -20,9 +22,9 @@ func setupTest(t *testing.T, testName string, extraSetupFunc, extraTeardownFunc 
 }
 
 var (
-	testAdc  *prom.AwsDynamodbConnect
-	testMc   *prom.MongoConnect
-	testSqlc *prom.SqlConnect
+	testAdc  *dynamodb.AwsDynamodbConnect
+	testMc   *mongo.MongoConnect
+	testSqlc *sql.SqlConnect
 	testDao  UniversalDao
 )
 

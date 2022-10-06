@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,7 +14,7 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	_ "github.com/btnguyen2k/gocosmos"
 	"github.com/btnguyen2k/godal"
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/sql"
 )
 
 func TestRowMapperCosmosdb_ToRow(t *testing.T) {
@@ -130,12 +131,19 @@ func _testCosmosdbInitSqlConnect(t *testing.T, testName, tableName string) *prom
 	url = strings.ReplaceAll(url, "${loc}", urlTimezone)
 	url = strings.ReplaceAll(url, "${tz}", urlTimezone)
 	url = strings.ReplaceAll(url, "${timezone}", urlTimezone)
-	url += ";Db=henge"
+	dbre := regexp.MustCompile(`(?i);db=(\w+)`)
+	db := "godal"
+	findResult := dbre.FindAllStringSubmatch(url, -1)
+	if findResult == nil {
+		url += ";Db=" + db
+	} else {
+		db = findResult[0][1]
+	}
 	sqlc, err := NewCosmosdbConnection(url, timezone, driver, 10000, nil)
 	if err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "NewCosmosdbConnection", err)
 	}
-	sqlc.GetDB().Exec("CREATE DATABASE henge WITH maxru=10000")
+	sqlc.GetDB().Exec("CREATE DATABASE " + db + " WITH maxru=10000")
 	if err := _cleanupCosmosdb(sqlc, tableName); err != nil {
 		t.Fatalf("%s/%s failed: %s", testName, "_cleanupCosmosdb", err)
 	}

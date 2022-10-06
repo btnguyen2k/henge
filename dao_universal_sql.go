@@ -6,7 +6,7 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/sql"
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/sql"
 )
 
 // NewSqlConnection is convenient function to create prom.SqlConnect instance.

@@ -10,7 +10,7 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/cosmosdbsql"
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/sql"
 )
 
 // CosmosdbCollectionSpec holds specification of CosmosDB collection to be created.

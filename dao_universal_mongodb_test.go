@@ -13,7 +13,7 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	"github.com/btnguyen2k/godal"
 	"github.com/btnguyen2k/godal/mongo"
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/mongo"
 )
 
 func TestRowMapperMongo_ToRow(t *testing.T) {
@@ -120,11 +120,11 @@ func TestNewMongoConnection(t *testing.T) {
 
 func TestInitMongoCollection(t *testing.T) {
 	name := "TestInitMongoCollection"
-	collectionName := "table_temp"
-	mc := _testMongoInitMongoConnect(t, name, collectionName)
+	mc := _testMongoInitMongoConnect(t, name, testTable)
 	defer mc.Close(nil)
 	for i := 0; i < 2; i++ {
-		if err := InitMongoCollection(mc, collectionName); err != nil {
+		mc.GetCollection(testTable).Drop(nil)
+		if err := InitMongoCollection(mc, testTable); err != nil {
 			t.Fatalf("%s failed: %s", name, err)
 		}
 	}
@@ -132,10 +132,10 @@ func TestInitMongoCollection(t *testing.T) {
 
 var setupTestMongo = func(t *testing.T, testName string) {
 	testMc = _testMongoInitMongoConnect(t, testName, testTable)
+	testMc.GetCollection(testTable).Drop(nil)
 	if err := InitMongoCollection(testMc, testTable); err != nil {
 		t.Fatalf("%s failed: %s", testName, err)
 	}
-	testMc.GetCollection(testTable).Drop(nil)
 	index := map[string]interface{}{
 		"key":    map[string]interface{}{"email": 1},
 		"name":   "uidx_email",

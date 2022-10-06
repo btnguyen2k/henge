@@ -12,7 +12,7 @@ import (
 	"github.com/btnguyen2k/consu/reddo"
 	_ "github.com/btnguyen2k/gocosmos"
 	"github.com/btnguyen2k/godal"
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/sql"
 )
 
 func TestNewSqlConnection(t *testing.T) {

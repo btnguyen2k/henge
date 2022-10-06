@@ -3,7 +3,7 @@ package henge
 import (
 	"os"
 
-	"github.com/btnguyen2k/prom"
+	prom "github.com/btnguyen2k/prom/sql"
 )
 
 // NewSqliteConnection is helper function to create connection pools for SQLite.
