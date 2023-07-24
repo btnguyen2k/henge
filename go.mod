@@ -8,7 +8,7 @@ require (
 	github.com/btnguyen2k/consu/reddo v0.1.8
 	github.com/btnguyen2k/consu/semita v0.1.5
 	github.com/btnguyen2k/gocosmos v0.3.0
-	github.com/btnguyen2k/godal v0.6.0
+	github.com/btnguyen2k/godal v0.6.1
 	github.com/btnguyen2k/prom v0.4.1
 	github.com/denisenkom/go-mssqldb v0.12.2
 	github.com/go-sql-driver/mysql v1.7.1
