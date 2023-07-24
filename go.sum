@@ -24,8 +24,8 @@ github.com/btnguyen2k/consu/semita v0.1.5/go.mod h1:fksCe3L4kxiJVnKKhUXKI8mcFdB9
 github.com/btnguyen2k/gocosmos v0.1.6/go.mod h1:BYrAnNLG+e5NCz9q0X9dkjhMM1XkYhyRG74bQX4Wb1w=
 github.com/btnguyen2k/gocosmos v0.3.0 h1:218OaZpnWRuXoHiLA8DuSf80xL0If7n9Yt8N6t2JWvI=
 github.com/btnguyen2k/gocosmos v0.3.0/go.mod h1:eToVV+1+mpht97WvC/EzTOb+4kHTUc/9Z2zNUSKbCUI=
-github.com/btnguyen2k/godal v0.6.0 h1:VZYm+j7Bho3Fi60kKv8m4lUsf0eEEunH+tMSIJ3TW1U=
-github.com/btnguyen2k/godal v0.6.0/go.mod h1:rtn5ofLR6V1+61Z2iu4+UndKxaRp4wgGlHY7nFg44bQ=
+github.com/btnguyen2k/godal v0.6.1 h1:7sGdASMxhg6v7gAoGbYc8jUzg6KlSCx2UL20SZa03pw=
+github.com/btnguyen2k/godal v0.6.1/go.mod h1:rtn5ofLR6V1+61Z2iu4+UndKxaRp4wgGlHY7nFg44bQ=
 github.com/btnguyen2k/prom v0.4.1 h1:fxuHIBNgWXiIZ2IteV8UUV2MYRWmM46OM3Z2mFBnXPk=
 github.com/btnguyen2k/prom v0.4.1/go.mod h1:S2mxIOugWK0SaNFJg+BTrO+cM5PMXsmfX/Yw8lT6wDY=
 github.com/cespare/xxhash/v2 v2.1.2/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
