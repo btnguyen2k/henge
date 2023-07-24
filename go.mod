@@ -7,7 +7,7 @@ require (
 	github.com/btnguyen2k/consu/checksum v0.1.2
 	github.com/btnguyen2k/consu/reddo v0.1.8
 	github.com/btnguyen2k/consu/semita v0.1.5
-	github.com/btnguyen2k/gocosmos v0.1.6
+	github.com/btnguyen2k/gocosmos v0.3.0
 	github.com/btnguyen2k/godal v0.6.0
 	github.com/btnguyen2k/prom v0.4.1
 	github.com/denisenkom/go-mssqldb v0.12.2
