@@ -198,8 +198,8 @@ github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg78
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/godror/godror v0.33.3/go.mod h1:FbrZ7po7LyS3gUTdW/K1+kIoePvP/E044HpwptL4vqw=
 github.com/godror/godror v0.34.0/go.mod h1:9QtjJWw+r1v9zh93Qx+hSOfYRVgj11a/7TUnU/00Wbc=
-github.com/godror/godror v0.44.6 h1:3Aw45jpKkPsss80DVy4/XiqXUPCsHmW0efSHBQFi0h4=
-github.com/godror/godror v0.44.6/go.mod h1:KJwMtQpK9o3WdEiNw7qvgSk827YDLj9MV/bXSzvUzlo=
+github.com/godror/godror v0.44.7 h1:fGxtxozidwBR3C1FVTrMiH77maOnMA4HqltDS/YM7O0=
+github.com/godror/godror v0.44.7/go.mod h1:KJwMtQpK9o3WdEiNw7qvgSk827YDLj9MV/bXSzvUzlo=
 github.com/godror/knownpb v0.1.0/go.mod h1:4nRFbQo1dDuwKnblRXDxrfCFYeT4hjg3GjMqef58eRE=
 github.com/godror/knownpb v0.1.2 h1:icMyYsYVpGmzhoVA01xyd0o4EaubR31JPK1UxQWe4kM=
 github.com/godror/knownpb v0.1.2/go.mod h1:zs9hH+lwj7mnPHPnKCcxdOGz38Axa9uT+97Ng+Nnu5s=
