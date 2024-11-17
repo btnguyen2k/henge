@@ -26,7 +26,7 @@ jobs:
         export MYSQL_URL="test:test@tcp(localhost:3306)/test?charset=utf8mb4,utf8&parseTime=false&loc=Asia%2fHo_Chi_Minh"
         go test -v -count 1 -p 1 -cover -coverprofile=coverage_mysql.txt .
     - name: Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         flags: mysql
         name: mysql
@@ -50,7 +50,7 @@ jobs:
         export MSSQL_URL="sqlserver://sa:SecretPassword1@localhost:1433?database=tempdb"
         go test -v -count 1 -p 1 -cover -coverprofile=coverage_mssql.txt .
     - name: Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         flags: mssql
         name: mssql
@@ -74,7 +74,7 @@ jobs:
         export PGSQL_URL="postgres://test:test@localhost:5432/test?sslmode=disable&client_encoding=UTF-8&application_name=henge"
         go test -v -count 1 -p 1 -cover -coverprofile=coverage_pgsql.txt .
     - name: Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         flags: pgsql
         name: pgsql
@@ -97,7 +97,7 @@ jobs:
         export SQLITE_URL="./temp/temp.db"
         go test -v -count 1 -p 1 -cover -coverprofile=coverage_sqlite.txt .
     - name: Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         flags: sqlite
         name: sqlite
@@ -124,7 +124,7 @@ jobs:
         $env:TIMEZONE='Asia/Ho_Chi_Minh'
         go test -v -count 1 -p 1 -cover -coverprofile="coverage_cosmosdb_sql.txt" .
     - name: Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         flags: cosmosdb_sql
         name: cosmosdb_sql
