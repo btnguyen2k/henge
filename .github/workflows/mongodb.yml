@@ -26,7 +26,7 @@ jobs:
         export MONGO_URL="mongodb://test:test@localhost:27017/?authSource=admin"
         go test -v -count 1 -p 1 -cover -coverprofile=coverage_mongo_standalone.txt .
     - name: Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         flags: mongo_standalone
         name: mongo_standalone
@@ -50,7 +50,7 @@ jobs:
         export MONGO_URL="mongodb://root:test@localhost:27017/?authSource=admin&replicaSet=replicaset"
         go test -v -count 1 -p 1 -cover -coverprofile=coverage_mongo_replicaset.txt .
     - name: Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         flags: mongo_replicaset
         name: mongo_replicaset
