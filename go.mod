@@ -1,6 +1,7 @@
 module github.com/btnguyen2k/henge
 
-go 1.13
+go 1.23.0
+
 toolchain go1.24.1
 
 require (
@@ -12,7 +13,7 @@ require (
 	github.com/btnguyen2k/godal v0.6.1
 	github.com/btnguyen2k/prom v0.4.1
 	github.com/denisenkom/go-mssqldb v0.12.3
-	github.com/go-sql-driver/mysql v1.9.1
+	github.com/go-sql-driver/mysql v1.9.2
 	github.com/godror/godror v0.47.1
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
