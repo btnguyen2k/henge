@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
-	github.com/aws/aws-sdk-go v1.55.7
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/btnguyen2k/consu/checksum v0.1.2
 	github.com/btnguyen2k/consu/reddo v0.1.9
 	github.com/btnguyen2k/consu/semita v0.1.5
