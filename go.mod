@@ -1,6 +1,6 @@
 module github.com/btnguyen2k/henge
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.1
 
@@ -13,14 +13,14 @@ require (
 	github.com/btnguyen2k/godal v0.6.1
 	github.com/btnguyen2k/prom v0.4.1
 	github.com/denisenkom/go-mssqldb v0.12.3
-	github.com/go-sql-driver/mysql v1.9.3
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/godror/godror v0.50.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 )
 
 require (
-	filippo.io/edwards25519 v1.1.0 // indirect
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/VictoriaMetrics/easyproto v0.1.4 // indirect
 	github.com/btnguyen2k/consu/gjrc v0.1.1 // indirect
 	github.com/btnguyen2k/consu/olaf v0.1.3 // indirect
