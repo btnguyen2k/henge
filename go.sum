@@ -69,8 +69,8 @@ github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/me
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
 github.com/godror/godror v0.33.3/go.mod h1:FbrZ7po7LyS3gUTdW/K1+kIoePvP/E044HpwptL4vqw=
 github.com/godror/godror v0.34.0/go.mod h1:9QtjJWw+r1v9zh93Qx+hSOfYRVgj11a/7TUnU/00Wbc=
-github.com/godror/godror v0.51.5 h1:NFvDtLILwg5mTU31DtL7Ae2AQvkDNL7nip+pSdMS4ow=
-github.com/godror/godror v0.51.5/go.mod h1:ZxKkyFw54Ou5CGeXhP4EjK0s9PSB+2W87GyL765XbO8=
+github.com/godror/godror v0.51.6 h1:kl1nKiaaCJ108OqGNr2pmEkzdkEnOkY7FnDOflNITQQ=
+github.com/godror/godror v0.51.6/go.mod h1:cJC60zusesc1J1wnOTvYfkBr53UFKekY4MY8j2of2uc=
 github.com/godror/knownpb v0.1.0/go.mod h1:4nRFbQo1dDuwKnblRXDxrfCFYeT4hjg3GjMqef58eRE=
 github.com/godror/knownpb v0.3.0 h1:+caUdy8hTtl7X05aPl3tdL540TvCcaQA6woZQroLZMw=
 github.com/godror/knownpb v0.3.0/go.mod h1:PpTyfJwiOEAzQl7NtVCM8kdPCnp3uhxsZYIzZ5PV4zU=
@@ -218,6 +218,8 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 h1:N/ElC8H3+5XpJzTSTfLsJV/mx9Q9g7kxmchpfZyxgzM=
 github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
+github.com/rogpeppe/retry v0.1.0 h1:6km4oqeZcFrnhx+PCPg/YxV3fnTdROBNVlSl8Pe/ztU=
+github.com/rogpeppe/retry v0.1.0/go.mod h1:/PtRtl9qXn+Pv5S4wN+Y5nusihQeI1PJ9U7KDcKzuvI=
 github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
 github.com/rs/zerolog v1.13.0/go.mod h1:YbFCdg8HfsridGWAh22vktObvhZbQsZXe4/zB0OKkWU=
 github.com/rs/zerolog v1.15.0/go.mod h1:xYTKnLHcpfU2225ny5qZjxnj9NvkumZYjJHlAThCjNc=
